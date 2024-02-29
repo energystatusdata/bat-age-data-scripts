@@ -1,13 +1,15 @@
+# Minimal code example to read, filter, and plot a data record. See comments marked with ToDo
+
 import pandas as pd  # easy and fast processing of large data sets
 # import numpy as np  # also helpful for processing and analyzing data
 import matplotlib.pyplot as plt  # plotting data
 
-import config_preprocessing as cfg
+import config_main as cfg
 import config_labels as csv_label
 
 # input_dir = cfg.CSV_RESULT_DIR
-input_dir = "D:\\bat\\analysis\\preprocessing\\result_12\\"
-filename = "cell_log_age_30s_P060_2_S16_C01.csv"
+input_dir = "D:\\bat\\analysis\\preprocessing\\result_12\\"  # ToDo: adjust input directory
+filename = "cell_log_age_30s_P060_2_S16_C01.csv"  # ToDo: which file do you want to read and plot?
 # filename = "cell_logext_P001_3_S05_C06.csv"
 # filename = "cell_logext_P021_2_S03_C08.csv"
 # filename = "pool_log_T00_P0.csv"
@@ -24,7 +26,7 @@ def run():
 
     print("set a breakpoint here to view the data frame")
 
-    # do stuff ...
+    # ToDo: do stuff here if you want ...
 
     # e.g., filter and show cell voltage, current and delta_Q values in a certain time window:
     x_var = csv_label.TIMESTAMP

@@ -1,3 +1,5 @@
+# Definition of the most important data column names. Incomplete list (many raw log columns are missing).
+
 SLAVE_ID = "slave_id"
 CELL_ID = "cell_id"
 POOL_ID = "pool_id"

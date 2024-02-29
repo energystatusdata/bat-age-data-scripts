@@ -1,9 +1,9 @@
-# plot script for battery degradation result data
+# Plot script for battery degradation result data.
 # If you want to use this script, e.g., to customize the plots, see comments marked with ToDo
 import time
 import traceback
 import pandas as pd
-import config_preprocessing as cfg
+import config_main as cfg
 import helper_tools as ht
 import color_tools as clr
 import multiprocessing
@@ -22,7 +22,7 @@ import config_logging  # as logging
 in_dir = "D:\\bat\\analysis\\preprocessing\\result_12\\"
 
 # --- logging ----------------------------------------------------------------------------------------------------------
-logging_filename = "11_plot_result_data_comparison.txt"
+logging_filename = "log_plot_result_data_comparison.txt"
 log_dir = in_dir + "log\\"
 # logging = config_logging.bat_data_logger(cfg.LOG_DIR + logging_filename)
 logging = config_logging.bat_data_logger(log_dir + logging_filename)
@@ -74,6 +74,7 @@ COLOR_CYAN = 'rgb(22,180,197)'
 COLOR_ORANGE = 'rgb(242,121,13)'
 COLOR_RED = 'rgb(203,37,38)'
 COLOR_GRAY = 'rgb(127,127,127)'
+COLOR_LIGHT_GRAY = 'rgb(200,200,200)'
 
 COLOR_RED_DARK = 'rgb(196,22,42)'
 COLOR_ORANGE_DARK = 'rgb(250,100,0)'
@@ -172,6 +173,7 @@ FILENAME_SOC_RE = f"SoC_%03u"
 FILENAME_SOC_ALL = "SoC_all"
 
 AX_TITLE_TIME = "Time"
+AX_TITLE_EFC = "Equivalent full cycles"
 AX_TITLE_VOLTAGE = "Voltage"
 AX_TITLE_SOC = "SoC"
 AX_TITLE_DV = "ΔV"
@@ -195,6 +197,7 @@ AX_TITLE_TOTAL_E = "Total E"
 AX_TITLE_EFFICIENCY = "Efficiency"
 AX_TITLE_CYCLES = "Cycles"
 
+UNIT_EFC = "EFC"
 UNIT_VOLTAGE = "V"
 UNIT_CURRENT = "A"
 UNIT_RESISTANCE_MILLI = "mΩ"
@@ -304,7 +307,7 @@ PTL_FILENAME = "PTL_FILENAME"  # output figure filename (without file ending). i
 # * mandatory -> only PTL_X_VAR and PTL_Y_VARS are mandatory, the rest is optional (can leave away or make "None")
 
 
-def get_eoc_plot_task(y_vars, var_colors, group_temperature, cyc_cond, cyc_chg, show_bg, relative_cap):
+def get_eoc_plot_task(x_var, y_vars, var_colors, group_temperature, cyc_cond, cyc_chg, show_bg, relative_cap):
     filt_opacity = None
     if cyc_chg is not None:
         if len(cyc_chg) > 1:
@@ -347,94 +350,94 @@ def get_eoc_plot_task(y_vars, var_colors, group_temperature, cyc_cond, cyc_chg, 
     is_energy_var = False
     if len(y_vars) > 1:
         if y_vars[0] == csv_label.DELTA_Q:
-            ax_title = AX_TITLE_DELTA_Q
+            y_ax_title = AX_TITLE_DELTA_Q
             title_var = "charged/discharged charge"
-            unit = UNIT_Q
+            y_unit = UNIT_Q
             file_unit = "dQcd"
             is_capacity_var = True
         elif y_vars[0] == csv_label.DELTA_E:
-            ax_title = AX_TITLE_DELTA_E
+            y_ax_title = AX_TITLE_DELTA_E
             title_var = "charged/discharged energy"
-            unit = UNIT_E
+            y_unit = UNIT_E
             file_unit = "dEcd"
             is_energy_var = True
         elif (csv_label.TOTAL_Q_DISCHG_SUM in y_vars) or (csv_label.TOTAL_Q_CHG_SUM in y_vars):
-            ax_title = AX_TITLE_TOTAL_Q
+            y_ax_title = AX_TITLE_TOTAL_Q
             title_var = "total processed charge"
-            unit = UNIT_Q
+            y_unit = UNIT_Q
             file_unit = "totalQcd"
             is_capacity_var = True
         elif (csv_label.TOTAL_E_DISCHG_SUM in y_vars) or (csv_label.TOTAL_E_CHG_SUM in y_vars):
-            ax_title = AX_TITLE_TOTAL_E
+            y_ax_title = AX_TITLE_TOTAL_E
             title_var = "total processed energy"
-            unit = UNIT_E
+            y_unit = UNIT_E
             file_unit = "totalEcd"
             is_energy_var = True
         elif (y_vars[0] == csv_label.ENERGY_EFFICIENCY) or (y_vars[0] == csv_label.COULOMB_EFFICIENCY):
-            ax_title = AX_TITLE_EFFICIENCY
+            y_ax_title = AX_TITLE_EFFICIENCY
             title_var = "efficiency"
-            unit = UNIT_PERCENT
+            y_unit = UNIT_PERCENT
             file_unit = "effQE"
         elif (y_vars[0] == csv_label.OCV_EST_START) or (y_vars[0] == csv_label.OCV_EST_END):
-            ax_title = AX_TITLE_OCV
+            y_ax_title = AX_TITLE_OCV
             title_var = "est. start/end OCV"
-            unit = UNIT_VOLTAGE
+            y_unit = UNIT_VOLTAGE
             file_unit = "OCVse"
         elif (y_vars[0] == csv_label.T_START) or (y_vars[0] == csv_label.T_END):
-            ax_title = AX_TITLE_TEMPERATURE
+            y_ax_title = AX_TITLE_TEMPERATURE
             title_var = "start/end temperature"
-            unit = UNIT_TEMPERATURE
+            y_unit = UNIT_TEMPERATURE
             file_unit = "Tse"
         elif (y_vars[0] == csv_label.SOC_EST_START) or (y_vars[0] == csv_label.SOC_EST_END):
-            ax_title = AX_TITLE_SOC
+            y_ax_title = AX_TITLE_SOC
             title_var = "est. start/end SoC"
-            unit = UNIT_PERCENT
+            y_unit = UNIT_PERCENT
             file_unit = "SoCse"
         else:
             print("get_eoc_plot_task: unimplemented y_vars = %s" % y_vars)
             return None
     elif y_vars[0] == csv_label.CAP_CHARGED_EST:
-        ax_title = AX_TITLE_CAP_REMAINING
+        y_ax_title = AX_TITLE_CAP_REMAINING
         title_var = TITLE_CAP_REMAINING
-        unit = UNIT_Q
+        y_unit = UNIT_Q
         file_unit = "Crem"
         is_capacity_var = True
     elif y_vars[0] == csv_label.DELTA_Q:
-        ax_title = AX_TITLE_DELTA_Q
+        y_ax_title = AX_TITLE_DELTA_Q
         title_var = "charged/discharged charge"
-        unit = UNIT_Q
+        y_unit = UNIT_Q
         file_unit = "dQ"
         is_capacity_var = True
     elif y_vars[0] == csv_label.DELTA_E:
-        ax_title = AX_TITLE_DELTA_E
+        y_ax_title = AX_TITLE_DELTA_E
         title_var = "charged/discharged energy"
-        unit = UNIT_E
+        y_unit = UNIT_E
         file_unit = "dE"
         is_energy_var = True
     elif y_vars[0] == csv_label.ENERGY_EFFICIENCY:
-        ax_title = AX_TITLE_EFFICIENCY
+        y_ax_title = AX_TITLE_EFFICIENCY
         title_var = "energy efficiency"
-        unit = UNIT_PERCENT
+        y_unit = UNIT_PERCENT
         file_unit = "effE"
     elif y_vars[0] == csv_label.COULOMB_EFFICIENCY:
-        ax_title = AX_TITLE_EFFICIENCY
+        y_ax_title = AX_TITLE_EFFICIENCY
         title_var = "coulomb efficiency"
-        unit = UNIT_PERCENT
+        y_unit = UNIT_PERCENT
         file_unit = "effQ"
     elif y_vars[0] == csv_label.EOC_NUM_CYCLES_OP:
-        ax_title = AX_TITLE_CYCLES
+        y_ax_title = AX_TITLE_CYCLES
         title_var = "number of cycles"
-        unit = None
+        y_unit = None
         file_unit = "Ncyc"
     elif y_vars[0] == csv_label.EOC_NUM_CYCLES_CU:
-        ax_title = AX_TITLE_CYCLES
+        y_ax_title = AX_TITLE_CYCLES
         title_var = "number of check-ups"
-        unit = None
+        y_unit = None
         file_unit = "Ncu"
     elif y_vars[0] == csv_label.CYC_DURATION:
-        ax_title = AX_TITLE_TIME
+        y_ax_title = AX_TITLE_TIME
         title_var = "cycling duration"
-        unit = UNIT_TIME_S
+        y_unit = UNIT_TIME_S
         file_unit = "tcyc"
     else:
         print("get_eoc_plot_task: unimplemented y_vars = %s" % y_vars)
@@ -444,11 +447,11 @@ def get_eoc_plot_task(y_vars, var_colors, group_temperature, cyc_cond, cyc_chg, 
     if relative_cap:
         if is_capacity_var:
             y_div = cfg.CELL_CAPACITY_NOMINAL
-            unit = "%"
+            y_unit = "%"
             file_unit = file_unit + "_rel"
         elif is_energy_var:
             y_div = cfg.CELL_ENERGY_NOMINAL
-            unit = "%"
+            y_unit = "%"
             file_unit = file_unit + "rel"
 
     if show_bg:
@@ -456,8 +459,24 @@ def get_eoc_plot_task(y_vars, var_colors, group_temperature, cyc_cond, cyc_chg, 
     else:
         bg_text = ""
 
+    if x_var == csv_label.TIMESTAMP:
+        x_ax_title = AX_TITLE_TIME
+        x_unit = UNIT_TIME
+        x_div = TIME_DIV
+        title_var = "Time vs. " + title_var
+        file_unit = "t_vs_" + file_unit
+    elif x_var == COL_EFC:
+        x_ax_title = AX_TITLE_EFC
+        x_unit = UNIT_EFC
+        x_div = None
+        title_var = "EFC vs. " + title_var
+        file_unit = "EFC_vs_" + file_unit
+    else:
+        print("get_eoc_plot_task: unimplemented x_var = %s" % x_var)
+        return None
+
     return {
-        PTL_X_VAR: csv_label.TIMESTAMP,
+        PTL_X_VAR: x_var,
         PTL_Y_VARS: y_vars,
         PTL_GROUP_TEMPERATURES: group_temperature,
         PTL_COLORS: var_colors,
@@ -467,11 +486,11 @@ def get_eoc_plot_task(y_vars, var_colors, group_temperature, cyc_cond, cyc_chg, 
         PTL_FILT_OPACITY: filt_opacity,
         PTL_FILT_LINESTYLE: filt_linestyle,
         PTL_SHOW_MARKER: show_marker,
-        PTL_X_AX_TITLE: AX_TITLE_TIME,
-        PTL_Y_AX_TITLE: ax_title,
-        PTL_X_UNIT: UNIT_TIME,
-        PTL_Y_UNIT: unit,
-        PTL_X_DIV: TIME_DIV,
+        PTL_X_AX_TITLE: x_ax_title,
+        PTL_Y_AX_TITLE: y_ax_title,
+        PTL_X_UNIT: x_unit,
+        PTL_Y_UNIT: y_unit,
+        PTL_X_DIV: x_div,
         PTL_Y_DIV: y_div,
         PTL_TITLE: ttl([TITLE_BASE_EOC, title_var, cond_title_text, chg_title_text]),
         PTL_FILENAME: fn([FILENAME_BASE_EOC, file_unit, bg_text, cond_file_text, chg_file_text]),
@@ -733,183 +752,346 @@ def get_eis_auxiliary_plot_task(y_vars, show_bg):
 # ToDo: PLOT_TASKS_LIST definition using helper functions
 PLOT_TASKS_LIST = {
     cfg.DataRecordType.CELL_EOC_FIXED: [
-        # --- EOC individual variables --------------------------------------------------
-        # DELTA_Q, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task([csv_label.DELTA_Q], None, True, [2, 1, 0], [0, 1], False, False),  # CU/CYC/other, dis/ch, no
-        get_eoc_plot_task([csv_label.DELTA_Q], None, True, [1], [0, 1], False, False),  # CYC, dis/chg, no
-        get_eoc_plot_task([csv_label.DELTA_Q], None, True, [2], [0, 1], False, False),  # CU, dis/chg, no
-        get_eoc_plot_task([csv_label.DELTA_Q], None, True, [2, 1, 0], [1], False, False),  # CU/CYC/other, chg, no
-        get_eoc_plot_task([csv_label.DELTA_Q], None, True, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task([csv_label.DELTA_Q], None, True, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task([csv_label.DELTA_Q], None, True, [2, 1, 0], [0], False, False),  # CU/CYC/other, dischg, no
-        get_eoc_plot_task([csv_label.DELTA_Q], None, True, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task([csv_label.DELTA_Q], None, True, [2], [0], True, False),  # CU, dischg, yes (all in backgr.)
+        # # --- EOC individual variables --------------------------------------------------
+        # # DELTA_Q, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+        #                   None, True, [2, 1, 0], [0, 1], False, False),  # CU/CYC/other, dis/ch, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+        #                   None, True, [1], [0, 1], False, False),  # CYC, dis/chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+        #                   None, True, [2], [0, 1], False, False),  # CU, dis/chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+        #                   None, True, [2, 1, 0], [1], False, False),  # CU/CYC/other, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+        #                   None, True, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+        #                   None, True, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+        #                   None, True, [2, 1, 0], [0], False, False),  # CU/CYC/other, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+        #                   None, True, [2], [0], True, False),  # CU, dischg, yes (all in backgr.)
+        #
+        # # CAP_CHARGED_EST, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+        #                   None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+        #                   None, True, [1], [0, 1], False, False),  # CYC, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+        #                   None, True, [2], [0, 1], False, False),  # CU, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+        #                   None, True, [2, 1, 0], [1], False, False),  # all, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+        #                   None, True, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+        #                   None, True, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+        #                   None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+        #                   None, True, [2], [0], True, False),  # CU, dischg, yes
+        # ... vs EFC
+        get_eoc_plot_task(COL_EFC, [csv_label.CAP_CHARGED_EST],
+                          None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(COL_EFC, [csv_label.CAP_CHARGED_EST],
+                          None, True, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(COL_EFC, [csv_label.CAP_CHARGED_EST],
+                          None, True, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(COL_EFC, [csv_label.CAP_CHARGED_EST],
+                          None, True, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(COL_EFC, [csv_label.CAP_CHARGED_EST],
+                          None, True, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(COL_EFC, [csv_label.CAP_CHARGED_EST],
+                          None, True, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(COL_EFC, [csv_label.CAP_CHARGED_EST],
+                          None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(COL_EFC, [csv_label.CAP_CHARGED_EST],
+                          None, True, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(COL_EFC, [csv_label.CAP_CHARGED_EST],
+                          None, True, [2], [0], True, False),  # CU, dischg, yes
 
-        # CAP_CHARGED_EST, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task([csv_label.CAP_CHARGED_EST], None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        get_eoc_plot_task([csv_label.CAP_CHARGED_EST], None, True, [1], [0, 1], False, False),  # CYC, all, no
-        get_eoc_plot_task([csv_label.CAP_CHARGED_EST], None, True, [2], [0, 1], False, False),  # CU, all, no
-        get_eoc_plot_task([csv_label.CAP_CHARGED_EST], None, True, [2, 1, 0], [1], False, False),  # all, chg, no
-        get_eoc_plot_task([csv_label.CAP_CHARGED_EST], None, True, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task([csv_label.CAP_CHARGED_EST], None, True, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task([csv_label.CAP_CHARGED_EST], None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
-        get_eoc_plot_task([csv_label.CAP_CHARGED_EST], None, True, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task([csv_label.CAP_CHARGED_EST], None, True, [2], [0], True, False),  # CU, dischg, yes
-
-        # DELTA_E, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task([csv_label.DELTA_E], None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        get_eoc_plot_task([csv_label.DELTA_E], None, True, [1], [0, 1], False, False),  # CYC, all, no
-        get_eoc_plot_task([csv_label.DELTA_E], None, True, [2], [0, 1], False, False),  # CU, all, no
-        get_eoc_plot_task([csv_label.DELTA_E], None, True, [2, 1, 0], [1], False, False),  # all, chg, no
-        get_eoc_plot_task([csv_label.DELTA_E], None, True, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task([csv_label.DELTA_E], None, True, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task([csv_label.DELTA_E], None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
-        get_eoc_plot_task([csv_label.DELTA_E], None, True, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task([csv_label.DELTA_E], None, True, [2], [0], True, False),  # CU, dischg, yes
-
-        # ENERGY_EFFICIENCY, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task([csv_label.ENERGY_EFFICIENCY], None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        get_eoc_plot_task([csv_label.ENERGY_EFFICIENCY], None, True, [1], [0, 1], False, False),  # CYC, all, no
-        get_eoc_plot_task([csv_label.ENERGY_EFFICIENCY], None, True, [2], [0, 1], False, False),  # CU, all, no
-        get_eoc_plot_task([csv_label.ENERGY_EFFICIENCY], None, True, [2, 1, 0], [1], False, False),  # all, chg, no
-        get_eoc_plot_task([csv_label.ENERGY_EFFICIENCY], None, True, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task([csv_label.ENERGY_EFFICIENCY], None, True, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task([csv_label.ENERGY_EFFICIENCY], None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
-        get_eoc_plot_task([csv_label.ENERGY_EFFICIENCY], None, True, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task([csv_label.ENERGY_EFFICIENCY], None, True, [2], [0], True, False),  # CU, dischg, yes
-
-        # COULOMB_EFFICIENCY, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task([csv_label.COULOMB_EFFICIENCY], None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        get_eoc_plot_task([csv_label.COULOMB_EFFICIENCY], None, True, [1], [0, 1], False, False),  # CYC, all, no
-        get_eoc_plot_task([csv_label.COULOMB_EFFICIENCY], None, True, [2], [0, 1], False, False),  # CU, all, no
-        get_eoc_plot_task([csv_label.COULOMB_EFFICIENCY], None, True, [2, 1, 0], [1], False, False),  # all, chg, no
-        get_eoc_plot_task([csv_label.COULOMB_EFFICIENCY], None, True, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task([csv_label.COULOMB_EFFICIENCY], None, True, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task([csv_label.COULOMB_EFFICIENCY], None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
-        get_eoc_plot_task([csv_label.COULOMB_EFFICIENCY], None, True, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task([csv_label.COULOMB_EFFICIENCY], None, True, [2], [0], True, False),  # CU, dischg, yes
-
-        # EOC_NUM_CYCLES_OP, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_OP], None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_OP], None, True, [1], [0, 1], False, False),  # CYC, all, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_OP], None, True, [2], [0, 1], False, False),  # CU, all, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_OP], None, True, [2, 1, 0], [1], False, False),  # all, chg, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_OP], None, True, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_OP], None, True, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_OP], None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_OP], None, True, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_OP], None, True, [2], [0], True, False),  # CU, dischg, yes
-
-        # EOC_NUM_CYCLES_CU, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_CU], None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_CU], None, True, [1], [0, 1], False, False),  # CYC, all, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_CU], None, True, [2], [0, 1], False, False),  # CU, all, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_CU], None, True, [2, 1, 0], [1], False, False),  # all, chg, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_CU], None, True, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_CU], None, True, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_CU], None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_CU], None, True, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task([csv_label.EOC_NUM_CYCLES_CU], None, True, [2], [0], True, False),  # CU, dischg, yes
-
-        # CYC_DURATION, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task([csv_label.CYC_DURATION], None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        get_eoc_plot_task([csv_label.CYC_DURATION], None, True, [1], [0, 1], False, False),  # CYC, all, no
-        get_eoc_plot_task([csv_label.CYC_DURATION], None, True, [2], [0, 1], False, False),  # CU, all, no
-        get_eoc_plot_task([csv_label.CYC_DURATION], None, True, [2, 1, 0], [1], False, False),  # all, chg, no
-        get_eoc_plot_task([csv_label.CYC_DURATION], None, True, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task([csv_label.CYC_DURATION], None, True, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task([csv_label.CYC_DURATION], None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
-        get_eoc_plot_task([csv_label.CYC_DURATION], None, True, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task([csv_label.CYC_DURATION], None, True, [2], [0], True, False),  # CU, dischg, yes
-
-        # --- EOC multiple variables ----------------------------------------------------
-        # delta_Q_all/chg/dischg, not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task(Y_VARS_DQ_ALL, COLORS_DQ_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        get_eoc_plot_task(Y_VARS_DQ_ALL, COLORS_DQ_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
-        get_eoc_plot_task(Y_VARS_DQ_ALL, COLORS_DQ_ALL, False, [2], [0, 1], False, False),  # CU, all, no
-        get_eoc_plot_task(Y_VARS_DQ_ALL, COLORS_DQ_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        get_eoc_plot_task(Y_VARS_DQ_ALL, COLORS_DQ_ALL, False, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task(Y_VARS_DQ_ALL, COLORS_DQ_ALL, False, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task(Y_VARS_DQ_ALL, COLORS_DQ_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        get_eoc_plot_task(Y_VARS_DQ_ALL, COLORS_DQ_ALL, False, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task(Y_VARS_DQ_ALL, COLORS_DQ_ALL, False, [2], [0], True, False),  # CU, dischg, yes
-
-        # delta_E_all/chg/dischg, not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task(Y_VARS_DE_ALL, COLORS_DE_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        get_eoc_plot_task(Y_VARS_DE_ALL, COLORS_DE_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
-        get_eoc_plot_task(Y_VARS_DE_ALL, COLORS_DE_ALL, False, [2], [0, 1], False, False),  # CU, all, no
-        get_eoc_plot_task(Y_VARS_DE_ALL, COLORS_DE_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        get_eoc_plot_task(Y_VARS_DE_ALL, COLORS_DE_ALL, False, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task(Y_VARS_DE_ALL, COLORS_DE_ALL, False, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task(Y_VARS_DE_ALL, COLORS_DE_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        get_eoc_plot_task(Y_VARS_DE_ALL, COLORS_DE_ALL, False, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task(Y_VARS_DE_ALL, COLORS_DE_ALL, False, [2], [0], True, False),  # CU, dischg, yes
-
-        # coulomb/energy efficiency, not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task(Y_VARS_EFFI_QE, COLORS_EFFI_QE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        get_eoc_plot_task(Y_VARS_EFFI_QE, COLORS_EFFI_QE, False, [1], [0, 1], False, False),  # CYC, all, no
-        get_eoc_plot_task(Y_VARS_EFFI_QE, COLORS_EFFI_QE, False, [2], [0, 1], False, False),  # CU, all, no
-        get_eoc_plot_task(Y_VARS_EFFI_QE, COLORS_EFFI_QE, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        get_eoc_plot_task(Y_VARS_EFFI_QE, COLORS_EFFI_QE, False, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task(Y_VARS_EFFI_QE, COLORS_EFFI_QE, False, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task(Y_VARS_EFFI_QE, COLORS_EFFI_QE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        get_eoc_plot_task(Y_VARS_EFFI_QE, COLORS_EFFI_QE, False, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task(Y_VARS_EFFI_QE, COLORS_EFFI_QE, False, [2], [0], True, False),  # CU, dischg, yes
-
-        # OCV (start/end), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task(Y_VARS_OCV_SE, COLORS_OCV_SE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        get_eoc_plot_task(Y_VARS_OCV_SE, COLORS_OCV_SE, False, [1], [0, 1], False, False),  # CYC, all, no
-        get_eoc_plot_task(Y_VARS_OCV_SE, COLORS_OCV_SE, False, [2], [0, 1], False, False),  # CU, all, no
-        get_eoc_plot_task(Y_VARS_OCV_SE, COLORS_OCV_SE, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        get_eoc_plot_task(Y_VARS_OCV_SE, COLORS_OCV_SE, False, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task(Y_VARS_OCV_SE, COLORS_OCV_SE, False, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task(Y_VARS_OCV_SE, COLORS_OCV_SE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        get_eoc_plot_task(Y_VARS_OCV_SE, COLORS_OCV_SE, False, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task(Y_VARS_OCV_SE, COLORS_OCV_SE, False, [2], [0], True, False),  # CU, dischg, yes
-
-        # temperature (start/end), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task(Y_VARS_T_SE, COLORS_T_SE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        get_eoc_plot_task(Y_VARS_T_SE, COLORS_T_SE, False, [1], [0, 1], False, False),  # CYC, all, no
-        get_eoc_plot_task(Y_VARS_T_SE, COLORS_T_SE, False, [2], [0, 1], False, False),  # CU, all, no
-        get_eoc_plot_task(Y_VARS_T_SE, COLORS_T_SE, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        get_eoc_plot_task(Y_VARS_T_SE, COLORS_T_SE, False, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task(Y_VARS_T_SE, COLORS_T_SE, False, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task(Y_VARS_T_SE, COLORS_T_SE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        get_eoc_plot_task(Y_VARS_T_SE, COLORS_T_SE, False, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task(Y_VARS_T_SE, COLORS_T_SE, False, [2], [0], True, False),  # CU, dischg, yes
-
-        # SoC (start/end), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task(Y_VARS_SOC_SE, COLORS_SOC_SE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        get_eoc_plot_task(Y_VARS_SOC_SE, COLORS_SOC_SE, False, [1], [0, 1], False, False),  # CYC, all, no
-        get_eoc_plot_task(Y_VARS_SOC_SE, COLORS_SOC_SE, False, [2], [0, 1], False, False),  # CU, all, no
-        get_eoc_plot_task(Y_VARS_SOC_SE, COLORS_SOC_SE, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        get_eoc_plot_task(Y_VARS_SOC_SE, COLORS_SOC_SE, False, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task(Y_VARS_SOC_SE, COLORS_SOC_SE, False, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task(Y_VARS_SOC_SE, COLORS_SOC_SE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        get_eoc_plot_task(Y_VARS_SOC_SE, COLORS_SOC_SE, False, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task(Y_VARS_SOC_SE, COLORS_SOC_SE, False, [2], [0], True, False),  # CU, dischg, yes
-
-        # Q_total_... (10x), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task(Y_VARS_Q_TOT_ALL, COLORS_Q_TOT_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        get_eoc_plot_task(Y_VARS_Q_TOT_ALL, COLORS_Q_TOT_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
-        get_eoc_plot_task(Y_VARS_Q_TOT_ALL, COLORS_Q_TOT_ALL, False, [2], [0, 1], False, False),  # CU, all, no
-        get_eoc_plot_task(Y_VARS_Q_TOT_ALL, COLORS_Q_TOT_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        get_eoc_plot_task(Y_VARS_Q_TOT_ALL, COLORS_Q_TOT_ALL, False, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task(Y_VARS_Q_TOT_ALL, COLORS_Q_TOT_ALL, False, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task(Y_VARS_Q_TOT_ALL, COLORS_Q_TOT_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        get_eoc_plot_task(Y_VARS_Q_TOT_ALL, COLORS_Q_TOT_ALL, False, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task(Y_VARS_Q_TOT_ALL, COLORS_Q_TOT_ALL, False, [2], [0], True, False),  # CU, dischg, yes
-
-        # E_total_... (10x), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        get_eoc_plot_task(Y_VARS_E_TOT_ALL, COLORS_E_TOT_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        get_eoc_plot_task(Y_VARS_E_TOT_ALL, COLORS_E_TOT_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
-        get_eoc_plot_task(Y_VARS_E_TOT_ALL, COLORS_E_TOT_ALL, False, [2], [0, 1], False, False),  # CU, all, no
-        get_eoc_plot_task(Y_VARS_E_TOT_ALL, COLORS_E_TOT_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        get_eoc_plot_task(Y_VARS_E_TOT_ALL, COLORS_E_TOT_ALL, False, [1], [1], False, False),  # CYC, chg, no
-        get_eoc_plot_task(Y_VARS_E_TOT_ALL, COLORS_E_TOT_ALL, False, [2], [1], False, False),  # CU, chg, no
-        get_eoc_plot_task(Y_VARS_E_TOT_ALL, COLORS_E_TOT_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        get_eoc_plot_task(Y_VARS_E_TOT_ALL, COLORS_E_TOT_ALL, False, [1], [0], False, False),  # CYC, dischg, no
-        get_eoc_plot_task(Y_VARS_E_TOT_ALL, COLORS_E_TOT_ALL, False, [2], [0], True, False),  # CU, dischg, yes
+        # # DELTA_E, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+        #                   None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+        #                   None, True, [1], [0, 1], False, False),  # CYC, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+        #                   None, True, [2], [0, 1], False, False),  # CU, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+        #                   None, True, [2, 1, 0], [1], False, False),  # all, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+        #                   None, True, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+        #                   None, True, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+        #                   None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+        #                   None, True, [2], [0], True, False),  # CU, dischg, yes
+        #
+        # # ENERGY_EFFICIENCY, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+        #                   None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+        #                   None, True, [1], [0, 1], False, False),  # CYC, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+        #                   None, True, [2], [0, 1], False, False),  # CU, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+        #                   None, True, [2, 1, 0], [1], False, False),  # all, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+        #                   None, True, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+        #                   None, True, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+        #                   None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+        #                   None, True, [2], [0], True, False),  # CU, dischg, yes
+        #
+        # # COULOMB_EFFICIENCY, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+        #                   None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+        #                   None, True, [1], [0, 1], False, False),  # CYC, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+        #                   None, True, [2], [0, 1], False, False),  # CU, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+        #                   None, True, [2, 1, 0], [1], False, False),  # all, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+        #                   None, True, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+        #                   None, True, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+        #                   None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+        #                   None, True, [2], [0], True, False),  # CU, dischg, yes
+        #
+        # # EOC_NUM_CYCLES_OP, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+        #                   None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+        #                   None, True, [1], [0, 1], False, False),  # CYC, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+        #                   None, True, [2], [0, 1], False, False),  # CU, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+        #                   None, True, [2, 1, 0], [1], False, False),  # all, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+        #                   None, True, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+        #                   None, True, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+        #                   None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+        #                   None, True, [2], [0], True, False),  # CU, dischg, yes
+        #
+        # # EOC_NUM_CYCLES_CU, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+        #                   None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+        #                   None, True, [1], [0, 1], False, False),  # CYC, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+        #                   None, True, [2], [0, 1], False, False),  # CU, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+        #                   None, True, [2, 1, 0], [1], False, False),  # all, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+        #                   None, True, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+        #                   None, True, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+        #                   None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+        #                   None, True, [2], [0], True, False),  # CU, dischg, yes
+        #
+        # # CYC_DURATION, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+        #                   None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+        #                   None, True, [1], [0, 1], False, False),  # CYC, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+        #                   None, True, [2], [0, 1], False, False),  # CU, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+        #                   None, True, [2, 1, 0], [1], False, False),  # all, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+        #                   None, True, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+        #                   None, True, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+        #                   None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+        #                   None, True, [2], [0], True, False),  # CU, dischg, yes
+        #
+        # # --- EOC multiple variables ----------------------------------------------------
+        # # delta_Q_all/chg/dischg, not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+        #                   COLORS_DQ_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+        #                   COLORS_DQ_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+        #                   COLORS_DQ_ALL, False, [2], [0, 1], False, False),  # CU, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+        #                   COLORS_DQ_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+        #                   COLORS_DQ_ALL, False, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+        #                   COLORS_DQ_ALL, False, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+        #                   COLORS_DQ_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+        #                   COLORS_DQ_ALL, False, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+        #                   COLORS_DQ_ALL, False, [2], [0], True, False),  # CU, dischg, yes
+        #
+        # # delta_E_all/chg/dischg, not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+        #                   COLORS_DE_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+        #                   COLORS_DE_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+        #                   COLORS_DE_ALL, False, [2], [0, 1], False, False),  # CU, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+        #                   COLORS_DE_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+        #                   COLORS_DE_ALL, False, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+        #                   COLORS_DE_ALL, False, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+        #                   COLORS_DE_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+        #                   COLORS_DE_ALL, False, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+        #                   COLORS_DE_ALL, False, [2], [0], True, False),  # CU, dischg, yes
+        #
+        # # coulomb/energy efficiency, not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+        #                   COLORS_EFFI_QE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+        #                   COLORS_EFFI_QE, False, [1], [0, 1], False, False),  # CYC, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+        #                   COLORS_EFFI_QE, False, [2], [0, 1], False, False),  # CU, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+        #                   COLORS_EFFI_QE, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+        #                   COLORS_EFFI_QE, False, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+        #                   COLORS_EFFI_QE, False, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+        #                   COLORS_EFFI_QE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+        #                   COLORS_EFFI_QE, False, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+        #                   COLORS_EFFI_QE, False, [2], [0], True, False),  # CU, dischg, yes
+        #
+        # # OCV (start/end), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+        #                   COLORS_OCV_SE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+        #                   COLORS_OCV_SE, False, [1], [0, 1], False, False),  # CYC, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+        #                   COLORS_OCV_SE, False, [2], [0, 1], False, False),  # CU, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+        #                   COLORS_OCV_SE, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+        #                   COLORS_OCV_SE, False, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+        #                   COLORS_OCV_SE, False, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+        #                   COLORS_OCV_SE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+        #                   COLORS_OCV_SE, False, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+        #                   COLORS_OCV_SE, False, [2], [0], True, False),  # CU, dischg, yes
+        #
+        # # temperature (start/end), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+        #                   COLORS_T_SE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+        #                   COLORS_T_SE, False, [1], [0, 1], False, False),  # CYC, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+        #                   COLORS_T_SE, False, [2], [0, 1], False, False),  # CU, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+        #                   COLORS_T_SE, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+        #                   COLORS_T_SE, False, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+        #                   COLORS_T_SE, False, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+        #                   COLORS_T_SE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+        #                   COLORS_T_SE, False, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+        #                   COLORS_T_SE, False, [2], [0], True, False),  # CU, dischg, yes
+        #
+        # # SoC (start/end), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+        #                   COLORS_SOC_SE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+        #                   COLORS_SOC_SE, False, [1], [0, 1], False, False),  # CYC, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+        #                   COLORS_SOC_SE, False, [2], [0, 1], False, False),  # CU, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+        #                   COLORS_SOC_SE, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+        #                   COLORS_SOC_SE, False, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+        #                   COLORS_SOC_SE, False, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+        #                   COLORS_SOC_SE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+        #                   COLORS_SOC_SE, False, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+        #                   COLORS_SOC_SE, False, [2], [0], True, False),  # CU, dischg, yes
+        #
+        # # Q_total_... (10x), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+        #                   COLORS_Q_TOT_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+        #                   COLORS_Q_TOT_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+        #                   COLORS_Q_TOT_ALL, False, [2], [0, 1], False, False),  # CU, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+        #                   COLORS_Q_TOT_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+        #                   COLORS_Q_TOT_ALL, False, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+        #                   COLORS_Q_TOT_ALL, False, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+        #                   COLORS_Q_TOT_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+        #                   COLORS_Q_TOT_ALL, False, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+        #                   COLORS_Q_TOT_ALL, False, [2], [0], True, False),  # CU, dischg, yes
+        #
+        # # E_total_... (10x), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+        #                   COLORS_E_TOT_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+        #                   COLORS_E_TOT_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+        #                   COLORS_E_TOT_ALL, False, [2], [0, 1], False, False),  # CU, all, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+        #                   COLORS_E_TOT_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+        #                   COLORS_E_TOT_ALL, False, [1], [1], False, False),  # CYC, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+        #                   COLORS_E_TOT_ALL, False, [2], [1], False, False),  # CU, chg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+        #                   COLORS_E_TOT_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+        #                   COLORS_E_TOT_ALL, False, [1], [0], False, False),  # CYC, dischg, no
+        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+        #                   COLORS_E_TOT_ALL, False, [2], [0], True, False),  # CU, dischg, yes
     ],
     # cfg.DataRecordType.CELL_EIS_FIXED: [
     #     # --- EIS overview --------------------------------------------------------------
@@ -937,6 +1119,7 @@ PLOT_TASKS_LIST = {
     #     #                   SOC_VALUE_ARRAY, True, False, None, None, False),
     #     # get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_DEG],  # f vs. -arg{Z}, OT - raw
     #     #                   SOC_VALUE_ARRAY, False, False, None, None, False),
+    #
     #     # --- EIS detail (one per SoC) --------------------------------------------------
     #     # get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, bg -> big
     #     #                   [10], True, False, EIS_X_LIM, EIS_Y_LIM, True),
@@ -1176,7 +1359,7 @@ PLOT_TASKS_LIST = {
     #     get_pulse_plot_task([COL_DV], [90], False),
     #     # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [90], False),
     #
-    #     --- PULSE other variables -----------------------------------------------------
+    #     # --- PULSE other variables -----------------------------------------------------
     #     get_pulse_auxiliary_plot_task([csv_label.PULSE_R_10_MS_MOHM], False),
     #     get_pulse_auxiliary_plot_task([csv_label.PULSE_R_1_S_MOHM], False),
     #     get_pulse_auxiliary_plot_task([csv_label.PULSE_T_AVG], False),
@@ -1315,9 +1498,9 @@ MARKER_DEFAULT = dict(size=5, opacity=0.8, line=None, symbol='circle')
 DEFAULT_LINE_STYLE = "solid"  # "solid", "dot", "dash", "longdash", "dashdot", "longdashdot", ... see:
 # https://plotly.com/python-api-reference/generated/plotly.graph_objects.scatter.html#plotly.graph_objects.scatter.Line.dash
 
-COLOR_BACKGROUND = COLOR_GRAY
+COLOR_BACKGROUND = COLOR_LIGHT_GRAY
 TRACE_BG_LINE_WIDTH = 1
-OPACITY_BACKGROUND = 0.1
+OPACITY_BACKGROUND = 0.25
 
 FIGURE_TEMPLATE = "custom_theme"  # "custom_theme" "plotly_white" "plotly" "none"
 

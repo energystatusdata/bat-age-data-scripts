@@ -1,17 +1,20 @@
+# ToDo: IMPORTANT: You have to adjust the paths below to make the scripts work! See comments marked with ToDo.
+
 from enum import IntEnum
 import numpy as np
 
 
-# --- path definitions ---
-CSV_RESULT_DIR = "H:\\Luh\\bat\\analysis\\preprocessing\\result\\"
+# --- path definitions --- ToDo: you have to adjust these paths! -------------------------------------------------------
+CSV_RESULT_DIR = "D:\\bat\\analysis\\preprocessing\\result\\"  # ToDo: change path to where you place the .csv files
 
-LOG_DIR = CSV_RESULT_DIR + "log\\"
-IMAGE_OUTPUT_DIR = CSV_RESULT_DIR + "images\\"
-MODEL_OUTPUT_DIR = CSV_RESULT_DIR + "model\\"
-CHECK_OUTPUT_DIR = CSV_RESULT_DIR + "check\\"
+LOG_DIR = CSV_RESULT_DIR + "log\\"  # sub-directory for Python script logs
+IMAGE_OUTPUT_DIR = CSV_RESULT_DIR + "images\\"  # output directory for images (e.g., .png, .pdf, .html)
+CHECK_OUTPUT_DIR = CSV_RESULT_DIR + "check\\"  # output for plausibility check file
 
-ORCA_PATH = 'C:\\Users\\AVT\\AppData\\Local\\Programs\\orca\\orca.exe'
+ORCA_PATH = 'C:\\Users\\AVT\\AppData\\Local\\Programs\\orca\\orca.exe'  # ToDo: change path to your orca installation in
+#                                                                           case you need to export images with orca!
 
+# --- usually, there is no need to adjust anything below this line -----------------------------------------------------
 CSV_FILENAME_05_RESULT_BASE_SLAVE = f"slave_%s_%s%02u.csv"  # slave + thermal management
 CSV_FILENAME_05_RESULT_BASE_SLAVE_RE = f"slave_(\w)_(\w)(\d+).csv"  # same as above, but for "re" library
 CSV_FILENAME_05_RESULT_BASE_CELL = f"cell_%s_P%03u_%u_S%02u_C%02u.csv"  # cell_log_P017_2_S04_C07.csv

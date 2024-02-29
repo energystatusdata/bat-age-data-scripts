@@ -1,10 +1,12 @@
+# This class configures the logger used in most other files. Usually, there is no need to change anything here.
+
 import os
 from logging import *
 import coloredlogs
 
 
 logging_level = DEBUG  # DEBUG, INFO, WARNING, ERROR, CRITICAL
-logging_format = "%(asctime)s.%(msecs)03d\t%(levelname)s\t%(message)s"
+logging_format = "%(asctime)s.%(msecs)03d\t%(levelname)s\t%(message)s"  # if wanted, adjust the log output format
 logging_dateformat = "%Y-%m-%d\t%H:%M:%S"
 writing_mode = 'a'  # 'w' = (over)write -> didn't work properly?, 'a' = append
 

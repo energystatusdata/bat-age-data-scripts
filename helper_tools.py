@@ -1,4 +1,4 @@
-import config_preprocessing as cfg
+import config_main as cfg
 import config_labels as csv_label
 import pandas as pd
 import numpy as np

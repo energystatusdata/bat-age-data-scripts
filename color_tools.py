@@ -1,3 +1,5 @@
+# Various helper functions related to colors (e.g., for plots).
+
 import re
 import numpy as np
 from plotly.express.colors import sample_colorscale
@@ -43,7 +45,7 @@ def get_rgb(rgb_string):
     re_match = re_pat_color_rgb.fullmatch(rgb_string)
     if re_match:
         return np.array([int(re_match.group(1)), int(re_match.group(2)), int(re_match.group(3))])  # r, g, b
-    return np.array([127, 127, 127])  # error
+    return np.array([127, 127, 127])  # error -> fall back to gray
 
 
 def get_rgb_string(rgb):
