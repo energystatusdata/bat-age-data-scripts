@@ -261,9 +261,9 @@ FIRST_USE_START_TIMESTAMP = 1665598800  # in LOG ext, delete data before Mi, 12.
 # were issues with slave 4 (needed multiple reboots, first few hundred data sets have invalid timestamps with test data
 
 CELL_PRODUCTION_TIMESTAMP = 1606392000  # 26.11.2020 12:00 UTC (estimated, based on the printed "+DT331K262A -")
-CELL_STORAGE_VOLTAGE = 3.555  # in V, +/- 50 mV, voltage at which the cell was stored before the experiment
+CELL_STORAGE_VOLTAGE = 3.5558  # in V, +/- 50 mV, voltage at which the cell was stored before experiment (as it arrived)
 # CELL_STORAGE_SOC = 26.7  # in % (100 = 100%), +/- 1%, SoC at which the cell was stored before the experiment
-CELL_STORAGE_TEMPERATURE = 20  # in °C, average temperature at which the cell was stored before the experiment
+CELL_STORAGE_TEMPERATURE = 18  # in °C, average (estimated) temperature at which the cell was stored before experiment
 
 CELL_CAPACITY_NOMINAL = 3.0  # in Ah
 CELL_ENERGY_NOMINAL = 11.0  # in Wh
