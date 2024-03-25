@@ -19,7 +19,7 @@ import config_labels as csv_label
 import config_logging  # as logging
 
 
-in_dir = "D:\\bat\\analysis\\preprocessing\\result_12\\"
+in_dir = "D:\\bat\\analysis\\preprocessing\\result\\"  # ToDo: Please adjust path to where the .csv files are located.
 
 # --- logging ----------------------------------------------------------------------------------------------------------
 logging_filename = "log_plot_result_data_comparison.txt"
@@ -66,6 +66,8 @@ TIME_DIV = 24.0 * 60.0 * 60.0  # seconds (data) -> days (plot)
 UNIT_TIME = "days"
 USE_RELATIVE_TIME = True  # use time relative to start of experiment (recommended)
 
+LARGE_FONT_SIZE = True
+COMPACT_AX_LABELS = True
 
 # --- color definitions ------------------------------------------------------------------------------------------------
 COLOR_BLACK = 'rgb(0,0,0)'
@@ -548,7 +550,7 @@ def get_pulse_plot_task(y_vars, socs, is_rt):
         PTL_OPACITY: OPACITY_PULSE,
         PTL_X_AX_TITLE: AX_TITLE_TIME,
         PTL_Y_AX_TITLE: ax_title,
-        PTL_X_UNIT: UNIT_TIME,
+        PTL_X_UNIT: UNIT_TIME_S,
         PTL_Y_UNIT: unit,
         PTL_TITLE: ttl([TITLE_BASE_PULSE, ax_title, title_t, title_socs]),
         PTL_FILENAME: fn([FILENAME_BASE_PULSE, file_unit, file_t, file_socs]),
@@ -695,7 +697,8 @@ def get_eis_plot_task(x_var, y_vars, socs, is_rt, group_temperature, x_lim, y_li
     }
 
 
-def get_eis_auxiliary_plot_task(y_vars, show_bg):
+def get_eis_auxiliary_plot_task(y_vars, show_bg,
+                                socs=None, rt_only=False, group_temperature=False, x_var=csv_label.TIMESTAMP):
     if y_vars[0] == csv_label.Z_REF_NOW:
         ax_title = AX_TITLE_RESISTANCE
         title_var = "Reference impedance"
@@ -723,21 +726,64 @@ def get_eis_auxiliary_plot_task(y_vars, show_bg):
         bg_text = "bg"
     else:
         bg_text = ""
+    if socs is None:
+        soc_values = SOC_VALUE_ARRAY
+        soc_colors = COLOR_SOCS_ARR
+        soc_title = TITLE_SOC_ALL
+        soc_filename = FILENAME_SOC_ALL
+    else:
+        soc_values = socs
+        soc_colors = []
+        for i in range(len(socs)):
+            soc_colors.append(COLOR_SOCS_ARR[socs[i] % len(COLOR_SOCS_ARR)])
+        soc_title = "SoC = " + "/".join(str(soc) for soc in socs) + " %"
+        soc_filename = "SoC_" + "+".join(str(soc) for soc in socs)
+    if rt_only:
+        filt_rt = [1]
+        filt_rt_opacity = [1.0]
+        filt_rt_title = " (only RT)"
+        filt_rt_filename = "_RT"
+    else:
+        filt_rt = [0, 1]
+        filt_rt_opacity = [1.0, 0.45]
+        filt_rt_title = ""
+        filt_rt_filename = ""
+    if group_temperature:
+        soc_filename = soc_filename + "_Tgroup"
+        colors = None
+    else:
+        colors = soc_colors
+    if x_var == csv_label.TIMESTAMP:
+        x_ax_title = AX_TITLE_TIME
+        x_unit = UNIT_TIME
+        x_div = TIME_DIV
+        title_var = "Time vs. " + title_var
+        file_unit = "t_vs_" + file_unit
+    elif x_var == COL_EFC:
+        x_ax_title = AX_TITLE_EFC
+        x_unit = UNIT_EFC
+        x_div = None
+        title_var = "EFC vs. " + title_var
+        file_unit = "EFC_vs_" + file_unit
+    else:
+        print("get_eis_auxiliary_plot_task: unimplemented x_var = %s" % x_var)
+        return None
     return {
-        PTL_X_VAR: csv_label.TIMESTAMP,
+        PTL_X_VAR: x_var,
         PTL_Y_VARS: y_vars,
         PTL_FILT_COLUMNS: [csv_label.SOC_NOM, csv_label.IS_ROOM_TEMP, csv_label.EIS_SEQUENCE_NUMBER],
-        PTL_FILT_VALUES: [SOC_VALUE_ARRAY, [0, 1], [0]],
-        PTL_FILT_COLORS: COLOR_SOCS_ARR,
-        PTL_FILT_OPACITY: [1.0, 0.45],
+        PTL_FILT_VALUES: [soc_values, filt_rt, [0]],
+        PTL_FILT_COLORS: colors,
+        PTL_FILT_OPACITY: filt_rt_opacity,
+        PTL_GROUP_TEMPERATURES: group_temperature,
         PTL_SHOW_MARKER: True,
-        PTL_X_AX_TITLE: AX_TITLE_TIME,
+        PTL_X_AX_TITLE: x_ax_title,
         PTL_Y_AX_TITLE: ax_title,
-        PTL_X_UNIT: UNIT_TIME,
+        PTL_X_UNIT: x_unit,
         PTL_Y_UNIT: unit,
-        PTL_X_DIV: TIME_DIV,
-        PTL_TITLE: ttl([TITLE_BASE_EIS, title_var, TITLE_SOC_ALL]),
-        PTL_FILENAME: fn([FILENAME_BASE_EIS, file_unit, FILENAME_SOC_ALL, bg_text]),
+        PTL_X_DIV: x_div,
+        PTL_TITLE: ttl([TITLE_BASE_EIS, title_var + filt_rt_title, soc_title]),
+        PTL_FILENAME: fn([FILENAME_BASE_EIS, file_unit + filt_rt_filename, soc_filename, bg_text]),
         PTL_PLOT_ALL_IN_BACKGROUND: show_bg,
     }
 
@@ -752,46 +798,46 @@ def get_eis_auxiliary_plot_task(y_vars, show_bg):
 # ToDo: PLOT_TASKS_LIST definition using helper functions
 PLOT_TASKS_LIST = {
     cfg.DataRecordType.CELL_EOC_FIXED: [
-        # # --- EOC individual variables --------------------------------------------------
-        # # DELTA_Q, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
-        #                   None, True, [2, 1, 0], [0, 1], False, False),  # CU/CYC/other, dis/ch, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
-        #                   None, True, [1], [0, 1], False, False),  # CYC, dis/chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
-        #                   None, True, [2], [0, 1], False, False),  # CU, dis/chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
-        #                   None, True, [2, 1, 0], [1], False, False),  # CU/CYC/other, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
-        #                   None, True, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
-        #                   None, True, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
-        #                   None, True, [2, 1, 0], [0], False, False),  # CU/CYC/other, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
-        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
-        #                   None, True, [2], [0], True, False),  # CU, dischg, yes (all in backgr.)
-        #
-        # # CAP_CHARGED_EST, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
-        #                   None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
-        #                   None, True, [1], [0, 1], False, False),  # CYC, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
-        #                   None, True, [2], [0, 1], False, False),  # CU, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
-        #                   None, True, [2, 1, 0], [1], False, False),  # all, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
-        #                   None, True, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
-        #                   None, True, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
-        #                   None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
-        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
-        #                   None, True, [2], [0], True, False),  # CU, dischg, yes
+        # --- EOC individual variables --------------------------------------------------
+        # DELTA_Q, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+                          None, True, [2, 1, 0], [0, 1], False, False),  # CU/CYC/other, dis/ch, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+                          None, True, [1], [0, 1], False, False),  # CYC, dis/chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+                          None, True, [2], [0, 1], False, False),  # CU, dis/chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+                          None, True, [2, 1, 0], [1], False, False),  # CU/CYC/other, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+                          None, True, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+                          None, True, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+                          None, True, [2, 1, 0], [0], False, False),  # CU/CYC/other, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+                          None, True, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_Q],
+                          None, True, [2], [0], True, False),  # CU, dischg, yes (all in backgr.)
+
+        # CAP_CHARGED_EST, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+                          None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+                          None, True, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+                          None, True, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+                          None, True, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+                          None, True, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+                          None, True, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+                          None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+                          None, True, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],
+                          None, True, [2], [0], True, False),  # CU, dischg, yes
         # ... vs EFC
         get_eoc_plot_task(COL_EFC, [csv_label.CAP_CHARGED_EST],
                           None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
@@ -812,561 +858,561 @@ PLOT_TASKS_LIST = {
         get_eoc_plot_task(COL_EFC, [csv_label.CAP_CHARGED_EST],
                           None, True, [2], [0], True, False),  # CU, dischg, yes
 
-        # # DELTA_E, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
-        #                   None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
-        #                   None, True, [1], [0, 1], False, False),  # CYC, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
-        #                   None, True, [2], [0, 1], False, False),  # CU, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
-        #                   None, True, [2, 1, 0], [1], False, False),  # all, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
-        #                   None, True, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
-        #                   None, True, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
-        #                   None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
-        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
-        #                   None, True, [2], [0], True, False),  # CU, dischg, yes
-        #
-        # # ENERGY_EFFICIENCY, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
-        #                   None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
-        #                   None, True, [1], [0, 1], False, False),  # CYC, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
-        #                   None, True, [2], [0, 1], False, False),  # CU, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
-        #                   None, True, [2, 1, 0], [1], False, False),  # all, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
-        #                   None, True, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
-        #                   None, True, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
-        #                   None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
-        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
-        #                   None, True, [2], [0], True, False),  # CU, dischg, yes
-        #
-        # # COULOMB_EFFICIENCY, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
-        #                   None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
-        #                   None, True, [1], [0, 1], False, False),  # CYC, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
-        #                   None, True, [2], [0, 1], False, False),  # CU, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
-        #                   None, True, [2, 1, 0], [1], False, False),  # all, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
-        #                   None, True, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
-        #                   None, True, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
-        #                   None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
-        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
-        #                   None, True, [2], [0], True, False),  # CU, dischg, yes
-        #
-        # # EOC_NUM_CYCLES_OP, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
-        #                   None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
-        #                   None, True, [1], [0, 1], False, False),  # CYC, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
-        #                   None, True, [2], [0, 1], False, False),  # CU, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
-        #                   None, True, [2, 1, 0], [1], False, False),  # all, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
-        #                   None, True, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
-        #                   None, True, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
-        #                   None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
-        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
-        #                   None, True, [2], [0], True, False),  # CU, dischg, yes
-        #
-        # # EOC_NUM_CYCLES_CU, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
-        #                   None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
-        #                   None, True, [1], [0, 1], False, False),  # CYC, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
-        #                   None, True, [2], [0, 1], False, False),  # CU, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
-        #                   None, True, [2, 1, 0], [1], False, False),  # all, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
-        #                   None, True, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
-        #                   None, True, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
-        #                   None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
-        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
-        #                   None, True, [2], [0], True, False),  # CU, dischg, yes
-        #
-        # # CYC_DURATION, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
-        #                   None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
-        #                   None, True, [1], [0, 1], False, False),  # CYC, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
-        #                   None, True, [2], [0, 1], False, False),  # CU, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
-        #                   None, True, [2, 1, 0], [1], False, False),  # all, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
-        #                   None, True, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
-        #                   None, True, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
-        #                   None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
-        #                   None, True, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
-        #                   None, True, [2], [0], True, False),  # CU, dischg, yes
-        #
-        # # --- EOC multiple variables ----------------------------------------------------
-        # # delta_Q_all/chg/dischg, not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
-        #                   COLORS_DQ_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
-        #                   COLORS_DQ_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
-        #                   COLORS_DQ_ALL, False, [2], [0, 1], False, False),  # CU, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
-        #                   COLORS_DQ_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
-        #                   COLORS_DQ_ALL, False, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
-        #                   COLORS_DQ_ALL, False, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
-        #                   COLORS_DQ_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
-        #                   COLORS_DQ_ALL, False, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
-        #                   COLORS_DQ_ALL, False, [2], [0], True, False),  # CU, dischg, yes
-        #
-        # # delta_E_all/chg/dischg, not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
-        #                   COLORS_DE_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
-        #                   COLORS_DE_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
-        #                   COLORS_DE_ALL, False, [2], [0, 1], False, False),  # CU, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
-        #                   COLORS_DE_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
-        #                   COLORS_DE_ALL, False, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
-        #                   COLORS_DE_ALL, False, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
-        #                   COLORS_DE_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
-        #                   COLORS_DE_ALL, False, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
-        #                   COLORS_DE_ALL, False, [2], [0], True, False),  # CU, dischg, yes
-        #
-        # # coulomb/energy efficiency, not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
-        #                   COLORS_EFFI_QE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
-        #                   COLORS_EFFI_QE, False, [1], [0, 1], False, False),  # CYC, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
-        #                   COLORS_EFFI_QE, False, [2], [0, 1], False, False),  # CU, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
-        #                   COLORS_EFFI_QE, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
-        #                   COLORS_EFFI_QE, False, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
-        #                   COLORS_EFFI_QE, False, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
-        #                   COLORS_EFFI_QE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
-        #                   COLORS_EFFI_QE, False, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
-        #                   COLORS_EFFI_QE, False, [2], [0], True, False),  # CU, dischg, yes
-        #
-        # # OCV (start/end), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
-        #                   COLORS_OCV_SE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
-        #                   COLORS_OCV_SE, False, [1], [0, 1], False, False),  # CYC, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
-        #                   COLORS_OCV_SE, False, [2], [0, 1], False, False),  # CU, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
-        #                   COLORS_OCV_SE, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
-        #                   COLORS_OCV_SE, False, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
-        #                   COLORS_OCV_SE, False, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
-        #                   COLORS_OCV_SE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
-        #                   COLORS_OCV_SE, False, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
-        #                   COLORS_OCV_SE, False, [2], [0], True, False),  # CU, dischg, yes
-        #
-        # # temperature (start/end), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
-        #                   COLORS_T_SE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
-        #                   COLORS_T_SE, False, [1], [0, 1], False, False),  # CYC, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
-        #                   COLORS_T_SE, False, [2], [0, 1], False, False),  # CU, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
-        #                   COLORS_T_SE, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
-        #                   COLORS_T_SE, False, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
-        #                   COLORS_T_SE, False, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
-        #                   COLORS_T_SE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
-        #                   COLORS_T_SE, False, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
-        #                   COLORS_T_SE, False, [2], [0], True, False),  # CU, dischg, yes
-        #
-        # # SoC (start/end), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
-        #                   COLORS_SOC_SE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
-        #                   COLORS_SOC_SE, False, [1], [0, 1], False, False),  # CYC, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
-        #                   COLORS_SOC_SE, False, [2], [0, 1], False, False),  # CU, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
-        #                   COLORS_SOC_SE, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
-        #                   COLORS_SOC_SE, False, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
-        #                   COLORS_SOC_SE, False, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
-        #                   COLORS_SOC_SE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
-        #                   COLORS_SOC_SE, False, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
-        #                   COLORS_SOC_SE, False, [2], [0], True, False),  # CU, dischg, yes
-        #
-        # # Q_total_... (10x), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
-        #                   COLORS_Q_TOT_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
-        #                   COLORS_Q_TOT_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
-        #                   COLORS_Q_TOT_ALL, False, [2], [0, 1], False, False),  # CU, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
-        #                   COLORS_Q_TOT_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
-        #                   COLORS_Q_TOT_ALL, False, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
-        #                   COLORS_Q_TOT_ALL, False, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
-        #                   COLORS_Q_TOT_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
-        #                   COLORS_Q_TOT_ALL, False, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
-        #                   COLORS_Q_TOT_ALL, False, [2], [0], True, False),  # CU, dischg, yes
-        #
-        # # E_total_... (10x), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
-        #                   COLORS_E_TOT_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
-        #                   COLORS_E_TOT_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
-        #                   COLORS_E_TOT_ALL, False, [2], [0, 1], False, False),  # CU, all, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
-        #                   COLORS_E_TOT_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
-        #                   COLORS_E_TOT_ALL, False, [1], [1], False, False),  # CYC, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
-        #                   COLORS_E_TOT_ALL, False, [2], [1], False, False),  # CU, chg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
-        #                   COLORS_E_TOT_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
-        #                   COLORS_E_TOT_ALL, False, [1], [0], False, False),  # CYC, dischg, no
-        # get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
-        #                   COLORS_E_TOT_ALL, False, [2], [0], True, False),  # CU, dischg, yes
+        # DELTA_E, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+                          None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+                          None, True, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+                          None, True, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+                          None, True, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+                          None, True, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+                          None, True, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+                          None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+                          None, True, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.DELTA_E],
+                          None, True, [2], [0], True, False),  # CU, dischg, yes
+
+        # ENERGY_EFFICIENCY, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+                          None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+                          None, True, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+                          None, True, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+                          None, True, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+                          None, True, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+                          None, True, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+                          None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+                          None, True, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.ENERGY_EFFICIENCY],
+                          None, True, [2], [0], True, False),  # CU, dischg, yes
+
+        # COULOMB_EFFICIENCY, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+                          None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+                          None, True, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+                          None, True, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+                          None, True, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+                          None, True, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+                          None, True, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+                          None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+                          None, True, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.COULOMB_EFFICIENCY],
+                          None, True, [2], [0], True, False),  # CU, dischg, yes
+
+        # EOC_NUM_CYCLES_OP, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+                          None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+                          None, True, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+                          None, True, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+                          None, True, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+                          None, True, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+                          None, True, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+                          None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+                          None, True, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_OP],
+                          None, True, [2], [0], True, False),  # CU, dischg, yes
+
+        # EOC_NUM_CYCLES_CU, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+                          None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+                          None, True, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+                          None, True, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+                          None, True, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+                          None, True, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+                          None, True, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+                          None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+                          None, True, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.EOC_NUM_CYCLES_CU],
+                          None, True, [2], [0], True, False),  # CU, dischg, yes
+
+        # CYC_DURATION, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+                          None, True, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+                          None, True, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+                          None, True, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+                          None, True, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+                          None, True, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+                          None, True, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+                          None, True, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+                          None, True, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CYC_DURATION],
+                          None, True, [2], [0], True, False),  # CU, dischg, yes
+
+        # --- EOC multiple variables ----------------------------------------------------
+        # delta_Q_all/chg/dischg, not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+                          COLORS_DQ_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+                          COLORS_DQ_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+                          COLORS_DQ_ALL, False, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+                          COLORS_DQ_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+                          COLORS_DQ_ALL, False, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+                          COLORS_DQ_ALL, False, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+                          COLORS_DQ_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+                          COLORS_DQ_ALL, False, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DQ_ALL,
+                          COLORS_DQ_ALL, False, [2], [0], True, False),  # CU, dischg, yes
+
+        # delta_E_all/chg/dischg, not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+                          COLORS_DE_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+                          COLORS_DE_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+                          COLORS_DE_ALL, False, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+                          COLORS_DE_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+                          COLORS_DE_ALL, False, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+                          COLORS_DE_ALL, False, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+                          COLORS_DE_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+                          COLORS_DE_ALL, False, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_DE_ALL,
+                          COLORS_DE_ALL, False, [2], [0], True, False),  # CU, dischg, yes
+
+        # coulomb/energy efficiency, not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+                          COLORS_EFFI_QE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+                          COLORS_EFFI_QE, False, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+                          COLORS_EFFI_QE, False, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+                          COLORS_EFFI_QE, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+                          COLORS_EFFI_QE, False, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+                          COLORS_EFFI_QE, False, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+                          COLORS_EFFI_QE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+                          COLORS_EFFI_QE, False, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_EFFI_QE,
+                          COLORS_EFFI_QE, False, [2], [0], True, False),  # CU, dischg, yes
+
+        # OCV (start/end), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+                          COLORS_OCV_SE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+                          COLORS_OCV_SE, False, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+                          COLORS_OCV_SE, False, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+                          COLORS_OCV_SE, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+                          COLORS_OCV_SE, False, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+                          COLORS_OCV_SE, False, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+                          COLORS_OCV_SE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+                          COLORS_OCV_SE, False, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_OCV_SE,
+                          COLORS_OCV_SE, False, [2], [0], True, False),  # CU, dischg, yes
+
+        # temperature (start/end), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+                          COLORS_T_SE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+                          COLORS_T_SE, False, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+                          COLORS_T_SE, False, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+                          COLORS_T_SE, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+                          COLORS_T_SE, False, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+                          COLORS_T_SE, False, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+                          COLORS_T_SE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+                          COLORS_T_SE, False, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_T_SE,
+                          COLORS_T_SE, False, [2], [0], True, False),  # CU, dischg, yes
+
+        # SoC (start/end), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+                          COLORS_SOC_SE, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+                          COLORS_SOC_SE, False, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+                          COLORS_SOC_SE, False, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+                          COLORS_SOC_SE, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+                          COLORS_SOC_SE, False, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+                          COLORS_SOC_SE, False, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+                          COLORS_SOC_SE, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+                          COLORS_SOC_SE, False, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_SOC_SE,
+                          COLORS_SOC_SE, False, [2], [0], True, False),  # CU, dischg, yes
+
+        # Q_total_... (10x), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+                          COLORS_Q_TOT_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+                          COLORS_Q_TOT_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+                          COLORS_Q_TOT_ALL, False, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+                          COLORS_Q_TOT_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+                          COLORS_Q_TOT_ALL, False, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+                          COLORS_Q_TOT_ALL, False, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+                          COLORS_Q_TOT_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+                          COLORS_Q_TOT_ALL, False, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_Q_TOT_ALL,
+                          COLORS_Q_TOT_ALL, False, [2], [0], True, False),  # CU, dischg, yes
+
+        # E_total_... (10x), not grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+                          COLORS_E_TOT_ALL, False, [2, 1, 0], [0, 1], False, False),  # all, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+                          COLORS_E_TOT_ALL, False, [1], [0, 1], False, False),  # CYC, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+                          COLORS_E_TOT_ALL, False, [2], [0, 1], False, False),  # CU, all, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+                          COLORS_E_TOT_ALL, False, [2, 1, 0], [1], False, False),  # all, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+                          COLORS_E_TOT_ALL, False, [1], [1], False, False),  # CYC, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+                          COLORS_E_TOT_ALL, False, [2], [1], False, False),  # CU, chg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+                          COLORS_E_TOT_ALL, False, [2, 1, 0], [0], False, False),  # all, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+                          COLORS_E_TOT_ALL, False, [1], [0], False, False),  # CYC, dischg, no
+        get_eoc_plot_task(csv_label.TIMESTAMP, Y_VARS_E_TOT_ALL,
+                          COLORS_E_TOT_ALL, False, [2], [0], True, False),  # CU, dischg, yes
     ],
-    # cfg.DataRecordType.CELL_EIS_FIXED: [
-    #     # --- EIS overview --------------------------------------------------------------
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # Re{Z} vs. -Im{Z}, RT, lim
-    #                       SOC_VALUE_ARRAY, True, False, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # Re{Z} vs. -Im{Z}, OT, lim
-    #                       SOC_VALUE_ARRAY, False, False, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # Re{Z} vs. -Im{Z}, RT
-    #                       SOC_VALUE_ARRAY, True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # Re{Z} vs. -Im{Z}, OT
-    #                       SOC_VALUE_ARRAY, False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, RT - comp.
-    #                       SOC_VALUE_ARRAY, True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, OT - comp.
-    #                       SOC_VALUE_ARRAY, False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, RT - comp.
-    #                       SOC_VALUE_ARRAY, True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, OT - comp.
-    #                       SOC_VALUE_ARRAY, False, False, None, None, False),
-    #     # get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_MOHM],  # f vs. |Z|, RT - raw
-    #     #                   SOC_VALUE_ARRAY, True, False, None, None, False),
-    #     # get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_MOHM],  # f vs. |Z|, OT - raw
-    #     #                   SOC_VALUE_ARRAY, False, False, None, None, False),
-    #     # get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_DEG],  # f vs. -arg{Z}, RT - raw
-    #     #                   SOC_VALUE_ARRAY, True, False, None, None, False),
-    #     # get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_DEG],  # f vs. -arg{Z}, OT - raw
-    #     #                   SOC_VALUE_ARRAY, False, False, None, None, False),
-    #
-    #     # --- EIS detail (one per SoC) --------------------------------------------------
-    #     # get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, bg -> big
-    #     #                   [10], True, False, EIS_X_LIM, EIS_Y_LIM, True),
-    #     # get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, bg -> big
-    #     #                   [10], True, True, EIS_X_LIM, EIS_Y_LIM, True),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, lim
-    #                       [10], True, False, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, lim
-    #                       [10], True, True, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, no lim
-    #                       [10], True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, no lim
-    #                       [10], True, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, no grp - comp.
-    #                       [10], True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, grp - comp.
-    #                       [10], True, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, no grp - comp.
-    #                       [10], True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, grp - comp.
-    #                       [10], True, True, None, None, False),
-    #
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, lim
-    #                       [10], False, False, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, lim
-    #                       [10], False, True, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, no lim
-    #                       [10], False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, no lim
-    #                       [10], False, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, no grp - comp.
-    #                       [10], False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, grp - comp.
-    #                       [10], False, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, no grp - comp.
-    #                       [10], False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, grp - comp.
-    #                       [10], False, True, None, None, False),
-    #
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, lim
-    #                       [30], True, False, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, lim
-    #                       [30], True, True, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, no lim
-    #                       [30], True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, no lim
-    #                       [30], True, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, no grp - comp.
-    #                       [30], True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, grp - comp.
-    #                       [30], True, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, no grp - comp.
-    #                       [30], True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, grp - comp.
-    #                       [30], True, True, None, None, False),
-    #
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, lim
-    #                       [30], False, False, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, lim
-    #                       [30], False, True, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, no lim
-    #                       [30], False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, no lim
-    #                       [30], False, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, no grp - comp.
-    #                       [30], False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, grp - comp.
-    #                       [30], False, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, no grp - comp.
-    #                       [30], False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, grp - comp.
-    #                       [30], False, True, None, None, False),
-    #
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, lim
-    #                       [50], True, False, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, lim
-    #                       [50], True, True, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, no lim
-    #                       [50], True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, no lim
-    #                       [50], True, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, no grp - comp.
-    #                       [50], True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, grp - comp.
-    #                       [50], True, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, no grp - comp.
-    #                       [50], True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, grp - comp.
-    #                       [50], True, True, None, None, False),
-    #
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, lim
-    #                       [50], False, False, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, lim
-    #                       [50], False, True, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, no lim
-    #                       [50], False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, no lim
-    #                       [50], False, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, no grp - comp.
-    #                       [50], False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, grp - comp.
-    #                       [50], False, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, no grp - comp.
-    #                       [50], False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, grp - comp.
-    #                       [50], False, True, None, None, False),
-    #
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, lim
-    #                       [70], True, False, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, lim
-    #                       [70], True, True, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, no lim
-    #                       [70], True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, no lim
-    #                       [70], True, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, no grp - comp.
-    #                       [70], True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, grp - comp.
-    #                       [70], True, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, no grp - comp.
-    #                       [70], True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, grp - comp.
-    #                       [70], True, True, None, None, False),
-    #
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, lim
-    #                       [70], False, False, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, lim
-    #                       [70], False, True, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, no lim
-    #                       [70], False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, no lim
-    #                       [70], False, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, no grp - comp.
-    #                       [70], False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, grp - comp.
-    #                       [70], False, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, no grp - comp.
-    #                       [70], False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, grp - comp.
-    #                       [70], False, True, None, None, False),
-    #
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, lim
-    #                       [90], True, False, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, lim
-    #                       [90], True, True, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, no lim
-    #                       [90], True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, no lim
-    #                       [90], True, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, no grp - comp.
-    #                       [90], True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, grp - comp.
-    #                       [90], True, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, no grp - comp.
-    #                       [90], True, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, grp - comp.
-    #                       [90], True, True, None, None, False),
-    #
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, lim
-    #                       [90], False, False, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, lim
-    #                       [90], False, True, EIS_X_LIM, EIS_Y_LIM, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, no lim
-    #                       [90], False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, no lim
-    #                       [90], False, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, no grp - comp.
-    #                       [90], False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, grp - comp.
-    #                       [90], False, True, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, no grp - comp.
-    #                       [90], False, False, None, None, False),
-    #     get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, grp - comp.
-    #                       [90], False, True, None, None, False),
-    #
-    #     # --- EIS other variables -------------------------------------------------------
-    #     get_eis_auxiliary_plot_task([csv_label.Z_REF_NOW], False),
-    #     get_eis_auxiliary_plot_task([csv_label.SOH_IMP], False),
-    #     get_eis_auxiliary_plot_task([csv_label.EIS_T_AVG], False),
-    #     get_eis_auxiliary_plot_task([csv_label.EIS_OCV_AVG], False),
-    #     get_eis_auxiliary_plot_task([csv_label.Z_REF_NOW], True),  # pretty large & slow plots?
-    #     get_eis_auxiliary_plot_task([csv_label.SOH_IMP], True),
-    #     get_eis_auxiliary_plot_task([csv_label.EIS_T_AVG], True),
-    #     get_eis_auxiliary_plot_task([csv_label.EIS_OCV_AVG], True),
-    # ],
-    # cfg.DataRecordType.CELL_PULSE_FIXED:  [
-    #     # --- PULSE overview ------------------------------------------------------------
-    #     get_pulse_plot_task([csv_label.V_CELL], SOC_VALUE_ARRAY, True),
-    #     get_pulse_plot_task([csv_label.I_CELL], SOC_VALUE_ARRAY, True),
-    #     get_pulse_plot_task([COL_DV], SOC_VALUE_ARRAY, True),
-    #     get_pulse_plot_task([csv_label.V_CELL], SOC_VALUE_ARRAY, False),
-    #     get_pulse_plot_task([csv_label.I_CELL], SOC_VALUE_ARRAY, False),
-    #     get_pulse_plot_task([COL_DV], SOC_VALUE_ARRAY, False),
-    #     # --- PULSE detail (one per SoC) ------------------------------------------------
-    #     get_pulse_plot_task([csv_label.V_CELL], [10], True),
-    #     get_pulse_plot_task([csv_label.I_CELL], [10], True),
-    #     get_pulse_plot_task([COL_DV], [10], True),
-    #     # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [10], True),
-    #     get_pulse_plot_task([csv_label.V_CELL], [10], False),
-    #     get_pulse_plot_task([csv_label.I_CELL], [10], False),
-    #     get_pulse_plot_task([COL_DV], [10], False),
-    #     # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [10], False),
-    #
-    #     get_pulse_plot_task([csv_label.V_CELL], [30], True),
-    #     get_pulse_plot_task([csv_label.I_CELL], [30], True),
-    #     get_pulse_plot_task([COL_DV], [30], True),
-    #     # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [30], True),
-    #     get_pulse_plot_task([csv_label.V_CELL], [30], False),
-    #     get_pulse_plot_task([csv_label.I_CELL], [30], False),
-    #     get_pulse_plot_task([COL_DV], [30], False),
-    #     # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [30], False),
-    #
-    #     get_pulse_plot_task([csv_label.V_CELL], [50], True),
-    #     get_pulse_plot_task([csv_label.I_CELL], [50], True),
-    #     get_pulse_plot_task([COL_DV], [50], True),
-    #     # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [50], True),
-    #     get_pulse_plot_task([csv_label.V_CELL], [50], False),
-    #     get_pulse_plot_task([csv_label.I_CELL], [50], False),
-    #     get_pulse_plot_task([COL_DV], [50], False),
-    #     # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [50], False),
-    #
-    #     get_pulse_plot_task([csv_label.V_CELL], [70], True),
-    #     get_pulse_plot_task([csv_label.I_CELL], [70], True),
-    #     get_pulse_plot_task([COL_DV], [70], True),
-    #     # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [70], True),
-    #     get_pulse_plot_task([csv_label.V_CELL], [70], False),
-    #     get_pulse_plot_task([csv_label.I_CELL], [70], False),
-    #     get_pulse_plot_task([COL_DV], [70], False),
-    #     # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [70], False),
-    #
-    #     get_pulse_plot_task([csv_label.V_CELL], [90], True),
-    #     get_pulse_plot_task([csv_label.I_CELL], [90], True),
-    #     get_pulse_plot_task([COL_DV], [90], True),
-    #     # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [90], True),
-    #     get_pulse_plot_task([csv_label.V_CELL], [90], False),
-    #     get_pulse_plot_task([csv_label.I_CELL], [90], False),
-    #     get_pulse_plot_task([COL_DV], [90], False),
-    #     # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [90], False),
-    #
-    #     # --- PULSE other variables -----------------------------------------------------
-    #     get_pulse_auxiliary_plot_task([csv_label.PULSE_R_10_MS_MOHM], False),
-    #     get_pulse_auxiliary_plot_task([csv_label.PULSE_R_1_S_MOHM], False),
-    #     get_pulse_auxiliary_plot_task([csv_label.PULSE_T_AVG], False),
-    #     # get_pulse_auxiliary_plot_task([csv_label.PULSE_R_10_MS_MOHM], True),  # pretty large & slow plots
-    #     # get_pulse_auxiliary_plot_task([csv_label.PULSE_R_1_S_MOHM], True),  # ...
-    #     # get_pulse_auxiliary_plot_task([csv_label.PULSE_T_AVG], True),  # ...
-    # ],
+    cfg.DataRecordType.CELL_EIS_FIXED: [
+        # --- EIS overview --------------------------------------------------------------
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # Re{Z} vs. -Im{Z}, RT, lim
+                          SOC_VALUE_ARRAY, True, False, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # Re{Z} vs. -Im{Z}, OT, lim
+                          SOC_VALUE_ARRAY, False, False, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # Re{Z} vs. -Im{Z}, RT
+                          SOC_VALUE_ARRAY, True, False, None, None, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # Re{Z} vs. -Im{Z}, OT
+                          SOC_VALUE_ARRAY, False, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, RT - comp.
+                          SOC_VALUE_ARRAY, True, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, OT - comp.
+                          SOC_VALUE_ARRAY, False, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, RT - comp.
+                          SOC_VALUE_ARRAY, True, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, OT - comp.
+                          SOC_VALUE_ARRAY, False, False, None, None, False),
+        # get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_MOHM],  # f vs. |Z|, RT - raw
+        #                   SOC_VALUE_ARRAY, True, False, None, None, False),
+        # get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_MOHM],  # f vs. |Z|, OT - raw
+        #                   SOC_VALUE_ARRAY, False, False, None, None, False),
+        # get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_DEG],  # f vs. -arg{Z}, RT - raw
+        #                   SOC_VALUE_ARRAY, True, False, None, None, False),
+        # get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_DEG],  # f vs. -arg{Z}, OT - raw
+        #                   SOC_VALUE_ARRAY, False, False, None, None, False),
+
+        # --- EIS detail (one per SoC) --------------------------------------------------
+        # get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, bg -> big
+        #                   [10], True, False, EIS_X_LIM, EIS_Y_LIM, True),
+        # get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, bg -> big
+        #                   [10], True, True, EIS_X_LIM, EIS_Y_LIM, True),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, lim
+                          [10], True, False, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, lim
+                          [10], True, True, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, no lim
+                          [10], True, False, None, None, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, no lim
+                          [10], True, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, no grp - comp.
+                          [10], True, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, grp - comp.
+                          [10], True, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, no grp - comp.
+                          [10], True, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, grp - comp.
+                          [10], True, True, None, None, False),
+
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, lim
+                          [10], False, False, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, lim
+                          [10], False, True, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, no lim
+                          [10], False, False, None, None, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, no lim
+                          [10], False, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, no grp - comp.
+                          [10], False, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, grp - comp.
+                          [10], False, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, no grp - comp.
+                          [10], False, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, grp - comp.
+                          [10], False, True, None, None, False),
+
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, lim
+                          [30], True, False, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, lim
+                          [30], True, True, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, no lim
+                          [30], True, False, None, None, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, no lim
+                          [30], True, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, no grp - comp.
+                          [30], True, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, grp - comp.
+                          [30], True, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, no grp - comp.
+                          [30], True, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, grp - comp.
+                          [30], True, True, None, None, False),
+
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, lim
+                          [30], False, False, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, lim
+                          [30], False, True, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, no lim
+                          [30], False, False, None, None, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, no lim
+                          [30], False, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, no grp - comp.
+                          [30], False, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, grp - comp.
+                          [30], False, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, no grp - comp.
+                          [30], False, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, grp - comp.
+                          [30], False, True, None, None, False),
+
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, lim
+                          [50], True, False, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, lim
+                          [50], True, True, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, no lim
+                          [50], True, False, None, None, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, no lim
+                          [50], True, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, no grp - comp.
+                          [50], True, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, grp - comp.
+                          [50], True, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, no grp - comp.
+                          [50], True, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, grp - comp.
+                          [50], True, True, None, None, False),
+
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, lim
+                          [50], False, False, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, lim
+                          [50], False, True, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, no lim
+                          [50], False, False, None, None, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, no lim
+                          [50], False, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, no grp - comp.
+                          [50], False, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, grp - comp.
+                          [50], False, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, no grp - comp.
+                          [50], False, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, grp - comp.
+                          [50], False, True, None, None, False),
+
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, lim
+                          [70], True, False, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, lim
+                          [70], True, True, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, no lim
+                          [70], True, False, None, None, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, no lim
+                          [70], True, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, no grp - comp.
+                          [70], True, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, grp - comp.
+                          [70], True, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, no grp - comp.
+                          [70], True, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, grp - comp.
+                          [70], True, True, None, None, False),
+
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, lim
+                          [70], False, False, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, lim
+                          [70], False, True, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, no lim
+                          [70], False, False, None, None, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, no lim
+                          [70], False, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, no grp - comp.
+                          [70], False, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, grp - comp.
+                          [70], False, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, no grp - comp.
+                          [70], False, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, grp - comp.
+                          [70], False, True, None, None, False),
+
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, lim
+                          [90], True, False, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, lim
+                          [90], True, True, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, no grp, no bg, no lim
+                          [90], True, False, None, None, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, RT, grp, no bg, no lim
+                          [90], True, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, no grp - comp.
+                          [90], True, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, RT, grp - comp.
+                          [90], True, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, no grp - comp.
+                          [90], True, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, RT, grp - comp.
+                          [90], True, True, None, None, False),
+
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, lim
+                          [90], False, False, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, lim
+                          [90], False, True, EIS_X_LIM, EIS_Y_LIM, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, no grp, no bg, no lim
+                          [90], False, False, None, None, False),
+        get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 10%, OT, grp, no bg, no lim
+                          [90], False, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, no grp - comp.
+                          [90], False, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_AMP_COMP_MOHM],  # f vs. |Z|, 10%, OT, grp - comp.
+                          [90], False, True, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, no grp - comp.
+                          [90], False, False, None, None, False),
+        get_eis_plot_task(csv_label.EIS_FREQ, [csv_label.Z_PH_COMP_DEG],  # f vs. -arg{Z}, 10%, OT, grp - comp.
+                          [90], False, True, None, None, False),
+
+        # --- EIS other variables -------------------------------------------------------
+        get_eis_auxiliary_plot_task([csv_label.Z_REF_NOW], False),
+        get_eis_auxiliary_plot_task([csv_label.SOH_IMP], False),
+        get_eis_auxiliary_plot_task([csv_label.EIS_T_AVG], False),
+        get_eis_auxiliary_plot_task([csv_label.EIS_OCV_AVG], False),
+        get_eis_auxiliary_plot_task([csv_label.Z_REF_NOW], True),  # pretty large & slow plots?
+        get_eis_auxiliary_plot_task([csv_label.SOH_IMP], True),
+        get_eis_auxiliary_plot_task([csv_label.EIS_T_AVG], True),
+        get_eis_auxiliary_plot_task([csv_label.EIS_OCV_AVG], True),
+    ],
+    cfg.DataRecordType.CELL_PULSE_FIXED:  [
+        # --- PULSE overview ------------------------------------------------------------
+        get_pulse_plot_task([csv_label.V_CELL], SOC_VALUE_ARRAY, True),
+        get_pulse_plot_task([csv_label.I_CELL], SOC_VALUE_ARRAY, True),
+        get_pulse_plot_task([COL_DV], SOC_VALUE_ARRAY, True),
+        get_pulse_plot_task([csv_label.V_CELL], SOC_VALUE_ARRAY, False),
+        get_pulse_plot_task([csv_label.I_CELL], SOC_VALUE_ARRAY, False),
+        get_pulse_plot_task([COL_DV], SOC_VALUE_ARRAY, False),
+        # --- PULSE detail (one per SoC) ------------------------------------------------
+        get_pulse_plot_task([csv_label.V_CELL], [10], True),
+        get_pulse_plot_task([csv_label.I_CELL], [10], True),
+        get_pulse_plot_task([COL_DV], [10], True),
+        # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [10], True),
+        get_pulse_plot_task([csv_label.V_CELL], [10], False),
+        get_pulse_plot_task([csv_label.I_CELL], [10], False),
+        get_pulse_plot_task([COL_DV], [10], False),
+        # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [10], False),
+
+        get_pulse_plot_task([csv_label.V_CELL], [30], True),
+        get_pulse_plot_task([csv_label.I_CELL], [30], True),
+        get_pulse_plot_task([COL_DV], [30], True),
+        # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [30], True),
+        get_pulse_plot_task([csv_label.V_CELL], [30], False),
+        get_pulse_plot_task([csv_label.I_CELL], [30], False),
+        get_pulse_plot_task([COL_DV], [30], False),
+        # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [30], False),
+
+        get_pulse_plot_task([csv_label.V_CELL], [50], True),
+        get_pulse_plot_task([csv_label.I_CELL], [50], True),
+        get_pulse_plot_task([COL_DV], [50], True),
+        # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [50], True),
+        get_pulse_plot_task([csv_label.V_CELL], [50], False),
+        get_pulse_plot_task([csv_label.I_CELL], [50], False),
+        get_pulse_plot_task([COL_DV], [50], False),
+        # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [50], False),
+
+        get_pulse_plot_task([csv_label.V_CELL], [70], True),
+        get_pulse_plot_task([csv_label.I_CELL], [70], True),
+        get_pulse_plot_task([COL_DV], [70], True),
+        # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [70], True),
+        get_pulse_plot_task([csv_label.V_CELL], [70], False),
+        get_pulse_plot_task([csv_label.I_CELL], [70], False),
+        get_pulse_plot_task([COL_DV], [70], False),
+        # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [70], False),
+
+        get_pulse_plot_task([csv_label.V_CELL], [90], True),
+        get_pulse_plot_task([csv_label.I_CELL], [90], True),
+        get_pulse_plot_task([COL_DV], [90], True),
+        # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [90], True),
+        get_pulse_plot_task([csv_label.V_CELL], [90], False),
+        get_pulse_plot_task([csv_label.I_CELL], [90], False),
+        get_pulse_plot_task([COL_DV], [90], False),
+        # get_pulse_plot_task([COL_DV, csv_label.I_CELL], [90], False),
+
+        # --- PULSE other variables -----------------------------------------------------
+        get_pulse_auxiliary_plot_task([csv_label.PULSE_R_10_MS_MOHM], False),
+        get_pulse_auxiliary_plot_task([csv_label.PULSE_R_1_S_MOHM], False),
+        get_pulse_auxiliary_plot_task([csv_label.PULSE_T_AVG], False),
+        # get_pulse_auxiliary_plot_task([csv_label.PULSE_R_10_MS_MOHM], True),  # pretty large & slow plots
+        # get_pulse_auxiliary_plot_task([csv_label.PULSE_R_1_S_MOHM], True),  # ...
+        # get_pulse_auxiliary_plot_task([csv_label.PULSE_T_AVG], True),  # ...
+    ],
 }
 
 # ToDo: PLOT_TASKS_LIST definition using manually defined structures:
@@ -1471,8 +1517,15 @@ PLOT_TASKS_LIST = {
 # }
 
 # --- plot formatting --------------------------------------------------------------------------------------------------
-SUBPLOT_H_SPACING_REL = 0.25
-SUBPLOT_V_SPACING_REL = 0.3
+if COMPACT_AX_LABELS:
+    SUBPLOT_H_SPACING_REL = 0.15
+    if LARGE_FONT_SIZE:
+        SUBPLOT_V_SPACING_REL = 0.3
+    else:
+        SUBPLOT_V_SPACING_REL = 0.25
+else:
+    SUBPLOT_H_SPACING_REL = 0.25
+    SUBPLOT_V_SPACING_REL = 0.3
 SUBPLOT_LR_MARGIN = 10
 SUBPLOT_TOP_MARGIN = 120
 SUBPLOT_BOT_MARGIN = 0
@@ -1480,6 +1533,7 @@ SUBPLOT_PADDING = 0
 
 PLOT_WIDTH_PER_COLUMN = 400  # in px - PLOT_WIDTH = PLOT_WIDTH_PER_COLUMN * SUBPLOT_COLS -> dynamically calculated
 PLOT_HEIGHT_PER_ROW = 300  # in px - PLOT_HEIGHT = PLOT_HEIGHT_PER_ROW * SUBPLOT_ROWS -> dynamically calculated
+PLOT_HEIGHT_PER_ROW_SINGLE = 400  # in px - PLOT_HEIGHT = PLOT_HEIGHT_PER_ROW_SINGLE if only one row
 
 PLOT_TITLE_Y_POS_REL = 30.0
 AGE_TYPE_TITLES = {cfg.age_type.CALENDAR: "calendar aging",
@@ -1518,8 +1572,22 @@ pio.templates['custom_theme']['layout']['yaxis']['zerolinecolor'] = MAJOR_GRID_C
 pio.templates['custom_theme']['layout']['xaxis']['linecolor'] = MAJOR_GRID_COLOR
 pio.templates['custom_theme']['layout']['yaxis']['linecolor'] = MAJOR_GRID_COLOR
 pio.templates['custom_theme']['layout']['yaxis']['zerolinecolor'] = MAJOR_GRID_COLOR
-pio.templates['custom_theme']['layout']['xaxis']['title']['standoff'] = 10
-pio.templates['custom_theme']['layout']['yaxis']['title']['standoff'] = 10
+if LARGE_FONT_SIZE:
+    pio.templates['custom_theme']['layout']['xaxis']['title']['standoff'] = 15
+    pio.templates['custom_theme']['layout']['yaxis']['title']['standoff'] = 15
+    TITLE_FONT_SIZE = 20
+    SUBPLOT_TITLE_FONT_SIZE = 18
+    AXIS_FONT_SIZE = 18
+    AXIS_TICK_FONT_SIZE = 18
+    pio.templates['custom_theme']['layout']['title']['font']['size'] = TITLE_FONT_SIZE
+    pio.templates['custom_theme']['layout']['xaxis']['title']['font']['size'] = AXIS_FONT_SIZE
+    pio.templates['custom_theme']['layout']['yaxis']['title']['font']['size'] = AXIS_FONT_SIZE
+    pio.templates['custom_theme']['layout']['xaxis']['tickfont']['size'] = AXIS_TICK_FONT_SIZE
+    pio.templates['custom_theme']['layout']['yaxis']['tickfont']['size'] = AXIS_TICK_FONT_SIZE
+    pio.templates['custom_theme']['layout']['annotationdefaults']['font']['size'] = SUBPLOT_TITLE_FONT_SIZE
+else:
+    pio.templates['custom_theme']['layout']['xaxis']['title']['standoff'] = 10
+    pio.templates['custom_theme']['layout']['yaxis']['title']['standoff'] = 10
 
 
 # --- classes ----------------------------------------------------------------------------------------------------------
@@ -1802,7 +1870,10 @@ def plot_thread(processor_number, task_queue, rep_queue, total_queue_size, df_di
                 subplot_h_spacing = (SUBPLOT_H_SPACING_REL / n_cols)
                 subplot_v_spacing = (SUBPLOT_V_SPACING_REL / n_rows)
                 plot_width = PLOT_WIDTH_PER_COLUMN * n_cols
-                plot_height = PLOT_HEIGHT_PER_ROW * n_rows
+                if n_rows > 1:
+                    plot_height = PLOT_HEIGHT_PER_ROW * n_rows
+                else:
+                    plot_height = PLOT_HEIGHT_PER_ROW_SINGLE
                 plot_title_y_pos = 1.0 - PLOT_TITLE_Y_POS_REL / plot_height
                 subplot_titles = get_subplot_titles(n_cols, n_rows, n_sub_rows, n_row_reps, col_var, col_vals,
                                                     row_var, row_vals, row_rep_var, row_rep_vals, group_temperatures)
@@ -2120,8 +2191,13 @@ def plot_thread(processor_number, task_queue, rep_queue, total_queue_size, df_di
                                  minor=dict(griddash='dot',
                                             gridcolor=MINOR_GRID_COLOR,
                                             ticklen=4),
-                                 title_text=x_ax_title,
+                                 # title_text=x_ax_title,
                                  )
+                if COMPACT_AX_LABELS:
+                    for i_col in range(n_cols):
+                        fig.update_xaxes(title_text=x_ax_title, row=n_rows, col=(i_col + 1))
+                else:
+                    fig.update_xaxes(title_text=x_ax_title)
 
                 if (x_var == csv_label.EIS_FREQ) and USE_LOG_FOR_FREQ_X_AXIS:
                     fig.update_xaxes(type="log")
@@ -2134,8 +2210,14 @@ def plot_thread(processor_number, task_queue, rep_queue, total_queue_size, df_di
                                  minor=dict(griddash='dot',
                                             gridcolor=MINOR_GRID_COLOR,
                                             ticklen=4),
-                                 title_text=y_ax_title,
+                                 # title_text=y_ax_title,
                                  )
+                if COMPACT_AX_LABELS:
+                    for i_row in range(n_rows):
+                        fig.update_yaxes(title_text=y_ax_title, row=(i_row + 1), col=1)
+                else:
+                    fig.update_yaxes(title_text=y_ax_title)
+
                 fig.update_layout(title={'text': "<b>" + plot_title + "</b>",
                                          'y': plot_title_y_pos,
                                          'x': 0.5,
@@ -2153,6 +2235,8 @@ def plot_thread(processor_number, task_queue, rep_queue, total_queue_size, df_di
                 # fig.update_layout(hovermode='x unified')
                 # fig.update_xaxes(showspikes=True)
                 # fig.update_yaxes(showspikes=True)
+                if LARGE_FONT_SIZE:
+                    fig.update_annotations(font_size=SUBPLOT_TITLE_FONT_SIZE)
 
                 # save figure
                 age_shortname = cfg.AGE_TYPE_SHORTNAMES.get(age_type)
