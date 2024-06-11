@@ -21,6 +21,7 @@ import config_logging  # as logging
 
 in_dir = "D:\\bat\\analysis\\preprocessing\\result\\"  # ToDo: Please adjust path to where the .csv files are located.
 
+
 # --- logging ----------------------------------------------------------------------------------------------------------
 logging_filename = "log_plot_result_data_comparison.txt"
 log_dir = in_dir + "log\\"
@@ -45,6 +46,7 @@ EXPORT_IMAGE = False  # save static plot images -> the image generation might ta
 IMAGE_FORMAT = "png"  # -> easiest to view
 # IMAGE_FORMAT = "svg"  # -> vector graphics
 # IMAGE_FORMAT = "pdf"  # -> vector graphics (but might have rendering issues)
+# IMAGE_FORMAT = "eps"  # -> vector graphics
 
 # plot filename: prefix, data record type (EOC/EIS/PLS), plot variable, age mode (CAL/CYC/PRF), version
 PLOT_FILENAME_BASE = f"%s%s_%s_%s_v%03u"
@@ -55,10 +57,11 @@ PLOT_SCALE_FACTOR = 1.0  # for image export (to have better/higher resolution th
 if (IMAGE_FORMAT == "jpg") or (IMAGE_FORMAT == "png"):
     PLOT_SCALE_FACTOR = 3.0
 
-# IMAGE_EXPORT_ENGINE = 'kaleido'  # alternative image export engine
-# for complex/big figures, kaleido might throw:
-# message->data_num_bytes() <= Channel::kMaximumMessageSize
-IMAGE_EXPORT_ENGINE = 'orca'
+IMAGE_EXPORT_ENGINE = 'kaleido'
+# ToDo: for complex/big figures, kaleido might throw:
+#   message->data_num_bytes() <= Channel::kMaximumMessageSize
+#   in this case, you can use another export engine (need to install orca):
+# IMAGE_EXPORT_ENGINE = 'orca'  # alternative image export engine
 
 
 # --- general plot options ---------------------------------------------------------------------------------------------
@@ -306,10 +309,17 @@ PTL_PLOT_ALL_IN_BACKGROUND = "PTL_PLOT_ALL_IN_BACKGROUND"  # if True, plot trace
 #   If not used, None of False: regular plotting.
 PTL_FILENAME = "PTL_FILENAME"  # output figure filename (without file ending). if None or empty, the script chooses
 #                                filenames automatically, while trying not to overwrite anything (version appendix)
+PTL_MINIMAL_X_AX_LABELS = "PTL_MINIMAL_X_AX_LABELS"  # reduce x-axis labels (only show in the lower row - this will
+#                                                      enable shared x-axes with similar limits) - compared to
+#                                                      "COMPACT_AX_LABELS", this will also eliminate tick labels
+PTL_MINIMAL_Y_AX_LABELS = "PTL_MINIMAL_Y_AX_LABELS"  # reduce y-axis labels (only show in the leftmost column - this
+#                                                      will enable shared y-axes with similar limits) - compared to
+#                                                      "COMPACT_AX_LABELS", this will also eliminate tick labels
 # * mandatory -> only PTL_X_VAR and PTL_Y_VARS are mandatory, the rest is optional (can leave away or make "None")
 
 
-def get_eoc_plot_task(x_var, y_vars, var_colors, group_temperature, cyc_cond, cyc_chg, show_bg, relative_cap):
+def get_eoc_plot_task(x_var, y_vars, var_colors, group_temperature, cyc_cond, cyc_chg, show_bg, relative_cap,
+                      minimal_x_ax_labels=None, minimal_y_ax_labels=None):
     filt_opacity = None
     if cyc_chg is not None:
         if len(cyc_chg) > 1:
@@ -497,10 +507,12 @@ def get_eoc_plot_task(x_var, y_vars, var_colors, group_temperature, cyc_cond, cy
         PTL_TITLE: ttl([TITLE_BASE_EOC, title_var, cond_title_text, chg_title_text]),
         PTL_FILENAME: fn([FILENAME_BASE_EOC, file_unit, bg_text, cond_file_text, chg_file_text]),
         PTL_PLOT_ALL_IN_BACKGROUND: show_bg,
+        PTL_MINIMAL_X_AX_LABELS: minimal_x_ax_labels,
+        PTL_MINIMAL_Y_AX_LABELS: minimal_y_ax_labels,
     }
 
 
-def get_pulse_plot_task(y_vars, socs, is_rt):
+def get_pulse_plot_task(y_vars, socs, is_rt, minimal_x_ax_labels=None, minimal_y_ax_labels=None):
     if (len(y_vars) == 2) and ((y_vars[0] == COL_DV) and (y_vars[1] == csv_label.I_CELL)
                                or (y_vars[1] == COL_DV) and (y_vars[0] == csv_label.I_CELL)):
         ax_title = AX_TITLE_VOLTAGE + " and " + AX_TITLE_CURRENT
@@ -555,6 +567,8 @@ def get_pulse_plot_task(y_vars, socs, is_rt):
         PTL_TITLE: ttl([TITLE_BASE_PULSE, ax_title, title_t, title_socs]),
         PTL_FILENAME: fn([FILENAME_BASE_PULSE, file_unit, file_t, file_socs]),
         PTL_GROUP_BY_AGING_COL: aging_col,
+        PTL_MINIMAL_X_AX_LABELS: minimal_x_ax_labels,
+        PTL_MINIMAL_Y_AX_LABELS: minimal_y_ax_labels,
     }
 
 
@@ -600,7 +614,8 @@ def get_pulse_auxiliary_plot_task(y_vars, show_bg):
     }
 
 
-def get_eis_plot_task(x_var, y_vars, socs, is_rt, group_temperature, x_lim, y_lim, show_bg):
+def get_eis_plot_task(x_var, y_vars, socs, is_rt, group_temperature, x_lim, y_lim, show_bg,
+                      minimal_x_ax_labels=None, minimal_y_ax_labels=None):
     hover_template = None
     hover_data = None
     if x_var == csv_label.Z_RE_COMP_MOHM:
@@ -694,11 +709,14 @@ def get_eis_plot_task(x_var, y_vars, socs, is_rt, group_temperature, x_lim, y_li
         PTL_X_LIMS: x_lim,
         PTL_Y_LIMS: y_lim,
         PTL_PLOT_ALL_IN_BACKGROUND: show_bg,
+        PTL_MINIMAL_X_AX_LABELS: minimal_x_ax_labels,
+        PTL_MINIMAL_Y_AX_LABELS: minimal_y_ax_labels,
     }
 
 
 def get_eis_auxiliary_plot_task(y_vars, show_bg,
-                                socs=None, rt_only=False, group_temperature=False, x_var=csv_label.TIMESTAMP):
+                                socs=None, rt_only=False, group_temperature=False, x_var=csv_label.TIMESTAMP,
+                                minimal_x_ax_labels=None, minimal_y_ax_labels=None):
     if y_vars[0] == csv_label.Z_REF_NOW:
         ax_title = AX_TITLE_RESISTANCE
         title_var = "Reference impedance"
@@ -785,6 +803,8 @@ def get_eis_auxiliary_plot_task(y_vars, show_bg,
         PTL_TITLE: ttl([TITLE_BASE_EIS, title_var + filt_rt_title, soc_title]),
         PTL_FILENAME: fn([FILENAME_BASE_EIS, file_unit + filt_rt_filename, soc_filename, bg_text]),
         PTL_PLOT_ALL_IN_BACKGROUND: show_bg,
+        PTL_MINIMAL_X_AX_LABELS: minimal_x_ax_labels,
+        PTL_MINIMAL_Y_AX_LABELS: minimal_y_ax_labels,
     }
 
 
@@ -1415,6 +1435,34 @@ PLOT_TASKS_LIST = {
     ],
 }
 
+# # ToDo: some of these plots are in the paper:
+# PLOT_TASKS_LIST = {
+#     cfg.DataRecordType.CELL_EOC_FIXED: [
+#         # --- EOC individual variables --------------------------------------------------
+#         # CAP_CHARGED_EST, grouped by T, absolute capacity/energy, ... [cyc_cond, cyc_chg, show_bg]
+#         get_eoc_plot_task(csv_label.TIMESTAMP, [csv_label.CAP_CHARGED_EST],  # CU, dischg, yes
+#                           None, True, [2], [0], True, False, minimal_x_ax_labels=True, minimal_y_ax_labels=True),
+#         # ... vs EFC
+#         get_eoc_plot_task(COL_EFC, [csv_label.CAP_CHARGED_EST],  # CU, dischg, yes
+#                           None, True, [2], [0], True, False, minimal_x_ax_labels=True, minimal_y_ax_labels=True),
+#     ],
+#     cfg.DataRecordType.CELL_EIS_FIXED: [
+#         # --- EIS detail (one per SoC) --------------------------------------------------
+#         get_eis_plot_task(csv_label.Z_RE_COMP_MOHM, [csv_label.Z_IM_COMP_MOHM],  # 50%, RT, no grp, no bg, no lim
+#                           [50], True, False, None, None, False, minimal_y_ax_labels=True),
+#
+#         # --- EIS other variables -------------------------------------------------------
+#         get_eis_auxiliary_plot_task([csv_label.Z_REF_NOW], True, group_temperature=False, x_var=csv_label.TIMESTAMP,
+#                                     minimal_y_ax_labels=True),
+#         get_eis_auxiliary_plot_task([csv_label.Z_REF_NOW], True, group_temperature=False, x_var=COL_EFC,
+#                                     minimal_y_ax_labels=True),
+#     ],
+#     cfg.DataRecordType.CELL_PULSE_FIXED: [
+#         # --- PULSE overview ------------------------------------------------------------
+#         get_pulse_plot_task([csv_label.V_CELL], [50], True, minimal_y_ax_labels=True),
+#     ],
+# }
+
 # ToDo: PLOT_TASKS_LIST definition using manually defined structures:
 # PLOT_TASKS_LIST = {
 #     cfg.DataRecordType.CELL_EOC_FIXED: [
@@ -1527,7 +1575,7 @@ else:
     SUBPLOT_H_SPACING_REL = 0.25
     SUBPLOT_V_SPACING_REL = 0.3
 SUBPLOT_LR_MARGIN = 10
-SUBPLOT_TOP_MARGIN = 120
+SUBPLOT_TOP_MARGIN = 120  # 60
 SUBPLOT_BOT_MARGIN = 0
 SUBPLOT_PADDING = 0
 
@@ -1535,7 +1583,7 @@ PLOT_WIDTH_PER_COLUMN = 400  # in px - PLOT_WIDTH = PLOT_WIDTH_PER_COLUMN * SUBP
 PLOT_HEIGHT_PER_ROW = 300  # in px - PLOT_HEIGHT = PLOT_HEIGHT_PER_ROW * SUBPLOT_ROWS -> dynamically calculated
 PLOT_HEIGHT_PER_ROW_SINGLE = 400  # in px - PLOT_HEIGHT = PLOT_HEIGHT_PER_ROW_SINGLE if only one row
 
-PLOT_TITLE_Y_POS_REL = 30.0
+PLOT_TITLE_Y_POS_REL = 30.0  # 5.0
 AGE_TYPE_TITLES = {cfg.age_type.CALENDAR: "calendar aging",
                    cfg.age_type.CYCLIC: "cyclic aging",
                    cfg.age_type.PROFILE: "profile aging"
@@ -1575,10 +1623,10 @@ pio.templates['custom_theme']['layout']['yaxis']['zerolinecolor'] = MAJOR_GRID_C
 if LARGE_FONT_SIZE:
     pio.templates['custom_theme']['layout']['xaxis']['title']['standoff'] = 15
     pio.templates['custom_theme']['layout']['yaxis']['title']['standoff'] = 15
-    TITLE_FONT_SIZE = 20
-    SUBPLOT_TITLE_FONT_SIZE = 18
-    AXIS_FONT_SIZE = 18
-    AXIS_TICK_FONT_SIZE = 18
+    TITLE_FONT_SIZE = 21  # 20
+    SUBPLOT_TITLE_FONT_SIZE = 19  # 18
+    AXIS_FONT_SIZE = 19  # 18
+    AXIS_TICK_FONT_SIZE = 19  # 18
     pio.templates['custom_theme']['layout']['title']['font']['size'] = TITLE_FONT_SIZE
     pio.templates['custom_theme']['layout']['xaxis']['title']['font']['size'] = AXIS_FONT_SIZE
     pio.templates['custom_theme']['layout']['yaxis']['title']['font']['size'] = AXIS_FONT_SIZE
@@ -1789,7 +1837,18 @@ def plot_thread(processor_number, task_queue, rep_queue, total_queue_size, df_di
             (filt_cols, filt_vals, filt_colors, filt_opacity, filt_linestyle, group_by, group_by_aging_col,
              group_temperatures, plot_colors, opacity, show_marker, x_ax_title, y_ax_title, x_unit, y_unit, x_div,
              y_div, x_lim, y_lim, plot_title, hover_data_col, hover_template_fun, plot_all_in_background,
-             custom_filename) = get_optional_plot_vars(plot_task)
+             custom_filename, minimal_x_ax_labels, minimal_y_ax_labels) = get_optional_plot_vars(plot_task)
+
+            if minimal_x_ax_labels is not True:  # check if minimal_x_ax_labels is None or has invalid type or is False
+                minimal_x_ax_labels = False
+                shared_x_axes = None  # set to None, so plotly uses the default (should be False?)
+            else:
+                shared_x_axes = True
+            if minimal_y_ax_labels is not True:  # check if minimal_y_ax_labels is None or has invalid type or is False
+                minimal_y_ax_labels = False
+                shared_y_axes = None  # set to None, so plotly uses the default (should be False?)
+            else:
+                shared_y_axes = True
 
             age_types = param_df[csv_label.AGE_TYPE].drop_duplicates().values
             for age_type in age_types:
@@ -1867,8 +1926,14 @@ def plot_thread(processor_number, task_queue, rep_queue, total_queue_size, df_di
                     n_rows = n_rows * n_row_reps
 
                 # generate empty figure
-                subplot_h_spacing = (SUBPLOT_H_SPACING_REL / n_cols)
-                subplot_v_spacing = (SUBPLOT_V_SPACING_REL / n_rows)
+                if minimal_x_ax_labels:
+                    subplot_v_spacing = ((SUBPLOT_V_SPACING_REL / 2.0) / n_rows)
+                else:
+                    subplot_v_spacing = (SUBPLOT_V_SPACING_REL / n_rows)
+                if minimal_y_ax_labels:
+                    subplot_h_spacing = ((SUBPLOT_H_SPACING_REL / 2.0) / n_cols)
+                else:
+                    subplot_h_spacing = (SUBPLOT_H_SPACING_REL / n_cols)
                 plot_width = PLOT_WIDTH_PER_COLUMN * n_cols
                 if n_rows > 1:
                     plot_height = PLOT_HEIGHT_PER_ROW * n_rows
@@ -1878,7 +1943,8 @@ def plot_thread(processor_number, task_queue, rep_queue, total_queue_size, df_di
                 subplot_titles = get_subplot_titles(n_cols, n_rows, n_sub_rows, n_row_reps, col_var, col_vals,
                                                     row_var, row_vals, row_rep_var, row_rep_vals, group_temperatures)
                 fig = make_subplots(cols=n_cols, rows=n_rows, subplot_titles=subplot_titles,
-                                    horizontal_spacing=subplot_h_spacing, vertical_spacing=subplot_v_spacing)
+                                    horizontal_spacing=subplot_h_spacing, vertical_spacing=subplot_v_spacing,
+                                    shared_xaxes=shared_x_axes, shared_yaxes=shared_y_axes)
 
                 age_min = None
                 age_max = None
@@ -2187,13 +2253,20 @@ def plot_thread(processor_number, task_queue, rep_queue, total_queue_size, df_di
                                  # ticklabelmode="period",
                                  tickcolor=MAJOR_GRID_COLOR,
                                  ticklen=10,
-                                 showticklabels=True,
+                                 # showticklabels=True,
                                  minor=dict(griddash='dot',
                                             gridcolor=MINOR_GRID_COLOR,
                                             ticklen=4),
                                  # title_text=x_ax_title,
                                  )
-                if COMPACT_AX_LABELS:
+                if minimal_x_ax_labels:
+                    for i_col in range(n_cols):
+                        fig.update_xaxes(showticklabels=True, row=n_rows, col=(i_col + 1))  # show in last row
+                        for i_row in range(n_rows - 1):
+                            fig.update_xaxes(showticklabels=False, row=(i_row + 1), col=(i_col + 1))  # hide in others
+                else:
+                    fig.update_xaxes(showticklabels=True)
+                if COMPACT_AX_LABELS or minimal_x_ax_labels:
                     for i_col in range(n_cols):
                         fig.update_xaxes(title_text=x_ax_title, row=n_rows, col=(i_col + 1))
                 else:
@@ -2206,13 +2279,20 @@ def plot_thread(processor_number, task_queue, rep_queue, total_queue_size, df_di
                                  ticks="outside",
                                  tickcolor=MAJOR_GRID_COLOR,
                                  ticklen=10,
-                                 showticklabels=True,
+                                 # showticklabels=True,
                                  minor=dict(griddash='dot',
                                             gridcolor=MINOR_GRID_COLOR,
                                             ticklen=4),
                                  # title_text=y_ax_title,
                                  )
-                if COMPACT_AX_LABELS:
+                if minimal_y_ax_labels:
+                    for i_row in range(n_rows):
+                        fig.update_yaxes(showticklabels=True, row=(i_row + 1), col=1)  # show in first col
+                        for i_col in range(1, n_cols):
+                            fig.update_yaxes(showticklabels=False, row=(i_row + 1), col=(i_col + 1))  # hide in others
+                else:
+                    fig.update_yaxes(showticklabels=True)
+                if COMPACT_AX_LABELS or minimal_y_ax_labels:
                     for i_row in range(n_rows):
                         fig.update_yaxes(title_text=y_ax_title, row=(i_row + 1), col=1)
                 else:
@@ -2544,9 +2624,20 @@ def get_optional_plot_vars(plot_task):
         if plot_task[PTL_FILENAME] is not None:
             custom_filename = PLOT_FILENAME_PREFIX + plot_task[PTL_FILENAME]  # PLOT_FILENAME_PREFIX to detect version
 
+    minimal_x_ax_labels = None
+    if PTL_MINIMAL_X_AX_LABELS in plot_task:
+        if plot_task[PTL_MINIMAL_X_AX_LABELS] is not None:
+            minimal_x_ax_labels = plot_task[PTL_MINIMAL_X_AX_LABELS]
+
+    minimal_y_ax_labels = None
+    if PTL_MINIMAL_Y_AX_LABELS in plot_task:
+        if plot_task[PTL_MINIMAL_Y_AX_LABELS] is not None:
+            minimal_y_ax_labels = plot_task[PTL_MINIMAL_Y_AX_LABELS]
+
     return (filt_cols, filt_vals, filt_colors, filt_opacity, filt_linestyle, group_by, group_by_aging_col,
             group_temperatures, plot_colors, opacity, show_marker, x_ax_title, y_ax_title, x_unit, y_unit, x_div, y_div,
-            x_lim, y_lim, plot_title, hover_data_col, hover_template_function, plot_all_in_background, custom_filename)
+            x_lim, y_lim, plot_title, hover_data_col, hover_template_function, plot_all_in_background, custom_filename,
+            minimal_x_ax_labels, minimal_y_ax_labels)
 
 
 def get_subplot_titles(n_cols, n_rows, n_sub_rows, n_row_reps, col_var, col_vals,
