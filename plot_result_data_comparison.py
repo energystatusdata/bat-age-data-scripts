@@ -42,7 +42,7 @@ SHOW_IN_BROWSER = False  # if True, open interactive plots in the browser --> ca
 EXPORT_HTML = True  # save interactive plots as html
 EXPORT_IMAGE = False  # save static plot images -> the image generation might take quite some time! -> only if needed
 
-# IMAGE_FORMAT = "jpg"  # -> tends to be larger than png since we don#t have many different colors
+# IMAGE_FORMAT = "jpg"  # -> tends to be larger than png since we don't have many different colors
 IMAGE_FORMAT = "png"  # -> easiest to view
 # IMAGE_FORMAT = "svg"  # -> vector graphics
 # IMAGE_FORMAT = "pdf"  # -> vector graphics (but might have rendering issues)
@@ -2646,15 +2646,15 @@ def get_subplot_titles(n_cols, n_rows, n_sub_rows, n_row_reps, col_var, col_vals
     for i_col in range(n_cols):
         col_text = None
         if len(col_vals) > 0:
-            col_text = ht.get_age_val_text(col_var, col_vals[i_col])
+            col_text = ht.get_age_val_text(col_var, col_vals[i_col], verbose=True)
         for i_row_rep in range(n_row_reps):
             row_rep_text = None
             if not group_temperatures:
-                row_rep_text = ht.get_age_val_text(row_rep_var, row_rep_vals[i_row_rep])
+                row_rep_text = ht.get_age_val_text(row_rep_var, row_rep_vals[i_row_rep], verbose=True)
             for i_sub_row in range(n_sub_rows):
                 row_text = None
                 if len(row_vals) > 0:
-                    row_text = ht.get_age_val_text(row_var, row_vals[i_sub_row])
+                    row_text = ht.get_age_val_text(row_var, row_vals[i_sub_row], verbose=True)
                 combined_text = ", ".join(filter(None, [col_text, row_rep_text, row_text]))
                 i_row = i_sub_row
                 if not group_temperatures:

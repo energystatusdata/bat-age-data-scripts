@@ -48,14 +48,14 @@ def get_age_op_text(age_type, temp, soc, chg_rate, dischg_rate, soc_min, soc_max
             + get_age_type_text(age_type, soc, chg_rate, dischg_rate, soc_min, soc_max, profile, cap_nom))
 
 
-def get_age_val_text(age_var, age_val):
+def get_age_val_text(age_var, age_val, verbose=False):
     if (age_var is None) or (age_val is None):
         return ""
     age_str = age_val
     if age_var == csv_label.AGE_TEMPERATURE:
         age_str = get_age_temp_text(age_val)
     elif age_var == csv_label.AGE_SOC:
-        age_str = get_age_soc_text_percent(age_val)
+        age_str = get_age_soc_text_percent(age_val, verbose)
     elif age_var == csv_label.AGE_PROFILE:
         age_str = get_age_profile_text(age_val)
     # AGE_C_RATES, AGE_SOC_RANGE -> age_val is age_str
@@ -124,8 +124,11 @@ def get_age_soc_text(soc):
         return f"%u" % soc
 
 
-def get_age_soc_text_percent(soc):
-    return get_age_soc_text(soc) + " %"
+def get_age_soc_text_percent(soc, verbose=False):
+    if verbose:
+        return "SoC = " + get_age_soc_text(soc) + " %"
+    else:
+        return get_age_soc_text(soc) + " %"
 
 
 def get_age_profile_text(profile):
